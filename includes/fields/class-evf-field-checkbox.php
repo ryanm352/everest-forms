@@ -19,7 +19,7 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	public function __construct() {
 		$this->name     = esc_html__( 'Checkboxes', 'everest-forms' );
 		$this->type     = 'checkbox';
-		$this->icon     = 'evf-icon  evf-icon-checkbox';
+		$this->icon     = 'evf-icon evf-icon-checkbox';
 		$this->order    = 70;
 		$this->group    = 'general';
 		$this->defaults = array(

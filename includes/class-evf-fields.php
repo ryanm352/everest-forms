@@ -83,6 +83,7 @@ class EVF_Fields {
 			'EVF_Field_Number',
 			'EVF_Field_Email',
 			'EVF_Field_URL',
+			'EVF_Field_Decision',
 			'EVF_Field_Date',
 		) );
 
