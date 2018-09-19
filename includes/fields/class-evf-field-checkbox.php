@@ -97,39 +97,11 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	 */
 	public function field_preview( $field ) {
 
-		$values  = ! empty( $field['choices'] ) ? $field['choices'] : $this->defaults;
-		$dynamic = ! empty( $field['dynamic_choices'] ) ? $field['dynamic_choices'] : false;
-
 		// Label
 		$this->field_preview_option( 'label', $field );
 
-		// Field checkbox elements
-		echo '<ul class="primary-input">';
-
-		// Notify if currently empty
-		if ( empty( $values ) ) {
-			$values = array(
-				'label' => __( '(empty)', 'everest-forms' ),
-			);
-		}
-
-		// Individual checkbox options
-		foreach ( $values as $key => $value ) {
-
-			$default  = isset( $value['default'] ) ? $value['default'] : '';
-			$selected = checked( '1', $default, false );
-
-			printf( '<li><input type="checkbox" %s disabled>%s</li>', $selected, $value['label'] );
-		}
-
-		echo '</ul>';
-
-		// Dynamic population is enabled and contains more than 20 items
-		if ( isset( $total ) && $total > 20 ) {
-			echo '<div class="everest-forms-alert-dynamic everest-forms-alert everest-forms-alert-warning">';
-			printf( __( 'Showing the first 20 choices.<br> All %d choices will be displayed when viewing the form.', 'everest-forms' ), absint( $total ) );
-			echo '</div>';
-		}
+		// Choices.
+		$this->field_preview_option( 'choices', $field );
 
 		// Description
 		$this->field_preview_option( 'description', $field );

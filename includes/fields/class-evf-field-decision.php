@@ -27,16 +27,13 @@ class EVF_Field_Decision extends EVF_Form_Fields {
 				'field_options' => array(
 					'label',
 					'meta',
-					'choices',
 					'description',
 					'required',
 				),
 			),
 			'advanced-options' => array(
 				'field_options' => array(
-					'show_values',
-					'input_columns',
-					'label_hide',
+					'default_value',
 					'css',
 				),
 			),
@@ -50,7 +47,14 @@ class EVF_Field_Decision extends EVF_Form_Fields {
 	 *
 	 * @param array $field
 	 */
-	public function field_preview( $field ) {}
+	public function field_preview( $field ) {
+
+		// Decision.
+		$this->field_preview_option( 'decision', $field );
+
+		// Description.
+		$this->field_preview_option( 'description', $field );
+	}
 
 	/**
 	 * Field display on the form front-end.
