@@ -19,8 +19,8 @@ class EVF_Field_Decision extends EVF_Form_Fields {
 	public function __construct() {
 		$this->name     = esc_html__( 'Decision Box', 'everest-forms' );
 		$this->type     = 'decision';
-		$this->icon     = 'evf-icon evf-icon-checkbox';
-		$this->order    = 11;
+		$this->icon     = 'evf-icon evf-icon-decision';
+		$this->order    = 25;
 		$this->group    = 'advanced';
 		$this->settings = array(
 			'basic-options' => array(
