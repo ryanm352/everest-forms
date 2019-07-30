@@ -23,7 +23,7 @@ class EVF_Admin {
 		add_action( 'admin_init', array( $this, 'admin_redirects' ) );
 		add_action( 'admin_footer', 'evf_print_js', 25 );
 		add_filter( 'admin_body_class', array( $this, 'admin_body_class' ) );
-		add_action( 'in_admin_header', array( $this, 'admin_header' ), 100 );
+		// add_action( 'in_admin_header', array( $this, 'admin_header' ), 100 );
 		add_filter( 'admin_footer_text', array( $this, 'admin_footer_text' ), 1 );
 	}
 

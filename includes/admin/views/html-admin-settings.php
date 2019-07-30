@@ -19,15 +19,20 @@ if ( ! $tab_exists ) {
 	<?php if ( 'integration' !== $current_tab ) : ?>
 	<form method="<?php echo esc_attr( apply_filters( 'everest_forms_settings_form_method_tab_' . $current_tab, 'post' ) ); ?>" id="mainform" action="" enctype="multipart/form-data">
 	<?php endif; ?>
-		<nav class="nav-tab-wrapper evf-nav-tab-wrapper">
-			<?php
-			foreach ( $tabs as $slug => $label ) {
-				echo '<a href="' . esc_html( admin_url( 'admin.php?page=evf-settings&tab=' . esc_attr( $slug ) ) ) . '" class="nav-tab ' . ( $current_tab === $slug ? 'nav-tab-active' : '' ) . '"><span class="evf-nav-icon ' . esc_attr( $slug ) . '"></span>' . esc_html( $label ) . '</a>';
-			}
+		<div class="everest-forms-header">
+			<div class="everest-forms-logo-wrapper">
+				<img class="everest-forms-logo" src="<?php echo EVF()->plugin_url() . '/assets/images/logo.png'; ?>" alt="Everest Forms Logo"/>
+			</div>
+			<nav class="nav-tab-wrapper evf-nav-tab-wrapper">
+				<?php
+				foreach ( $tabs as $slug => $label ) {
+					echo '<a href="' . esc_html( admin_url( 'admin.php?page=evf-settings&tab=' . esc_attr( $slug ) ) ) . '" class="nav-tab ' . ( $current_tab === $slug ? 'nav-tab-active' : '' ) . '"><span class="evf-nav-icon ' . esc_attr( $slug ) . '"></span>' . esc_html( $label ) . '</a>';
+				}
 
-			do_action( 'everest_forms_settings_tabs' );
-			?>
-		</nav>
+				do_action( 'everest_forms_settings_tabs' );
+				?>
+			</nav>
+		</div>
 		<div class="everest-forms-settings">
 			<h1 class="screen-reader-text"><?php echo esc_html( $current_tab_label ); ?></h1>
 			<?php
