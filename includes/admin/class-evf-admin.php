@@ -23,6 +23,7 @@ class EVF_Admin {
 		add_action( 'admin_init', array( $this, 'admin_redirects' ) );
 		add_action( 'admin_footer', 'evf_print_js', 25 );
 		add_filter( 'admin_body_class', array( $this, 'admin_body_class' ) );
+		add_action( 'in_admin_header', array( $this, 'admin_header' ), 100 );
 		add_filter( 'admin_footer_text', array( $this, 'admin_footer_text' ), 1 );
 	}
 
@@ -146,12 +147,14 @@ class EVF_Admin {
 					sprintf( '<strong>%s</strong>', esc_html__( 'Everest Forms', 'everest-forms' ) ),
 					'<a href="https://wordpress.org/support/plugin/everest-forms/reviews?rate=5#new-post" target="_blank" class="evf-rating-link" data-rated="' . esc_attr__( 'Thanks :)', 'everest-forms' ) . '">&#9733;&#9733;&#9733;&#9733;&#9733;</a>'
 				);
-				evf_enqueue_js( "
+				evf_enqueue_js(
+					"
 					jQuery( 'a.evf-rating-link' ).click( function() {
 						jQuery.post( '" . EVF()->ajax_url() . "', { action: 'everest_forms_rated' } );
 						jQuery( this ).parent().text( jQuery( this ).data( 'rated' ) );
 					});
-				" );
+				"
+				);
 			} else {
 				$footer_text = __( 'Thank you for creating with Everest Forms.', 'everest-forms' );
 			}
@@ -176,6 +179,28 @@ class EVF_Admin {
 		}
 
 		return $classes;
+	}
+
+	/**
+	 * Outputs the WPForms admin header.
+	 *
+	 * @since 1.6.0
+	 */
+	function admin_header() {
+		$screen    = get_current_screen();
+		$screen_id = $screen ? $screen->id : '';
+		$evf_pages = evf_get_screen_ids();
+
+		// Check to make sure we're on EverestForms addons page.
+		if ( ! in_array( $screen_id, $evf_pages, true ) ) {
+			return;
+		}
+		?>
+		<div id="everest-forms-header-temp"></div>
+		<div id="everest-forms-header" class="wpforms-header">
+			<img class="everest-forms-header-logo" src="<?php echo EVF()->plugin_url() . '/assets/images/logo.png'; ?>" alt="Everest Forms Logo"/>
+		</div>
+		<?php
 	}
 }
 
