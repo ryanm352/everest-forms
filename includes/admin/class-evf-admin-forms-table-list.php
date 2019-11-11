@@ -21,11 +21,13 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	 * Initialize the form table list.
 	 */
 	public function __construct() {
-		parent::__construct( array(
-			'singular' => 'form',
-			'plural'   => 'forms',
-			'ajax'     => false,
-		) );
+		parent::__construct(
+			array(
+				'singular' => 'form',
+				'plural'   => 'forms',
+				'ajax'     => false,
+			)
+		);
 	}
 
 	/**
@@ -43,6 +45,7 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	public function get_columns() {
 		return array(
 			'cb'        => '<input type="checkbox" />',
+			'enabled'   => '',
 			'title'     => __( 'Title', 'everest-forms' ),
 			'shortcode' => __( 'Shortcode', 'everest-forms' ),
 			'author'    => __( 'Author', 'everest-forms' ),
@@ -75,9 +78,22 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	}
 
 	/**
+	 * Column enabled.
+	 *
+	 * @param  object $posts Form object.
+	 * @return string
+	 */
+	public function column_enabled( $posts ) {
+		$form_data    = EVF()->form->get( absint( $posts->ID ), array( 'content_only' => true ) );
+		$form_enabled = isset( $form_data['form_enabled'] ) ? $form_data['form_enabled'] : 1;
+
+		return '<label class="everest-forms-toggle-form form-enabled"><input type="checkbox" data-form_id="' . absint( $posts->ID ) . '" value="1" ' . checked( 1, $form_enabled, false ) . '/><span class="slider round"></span></label>';
+	}
+
+	/**
 	 * Return title column.
 	 *
-	 * @param  object $post Form object.
+	 * @param  object $posts Form object.
 	 * @return string
 	 */
 	public function column_title( $posts ) {
@@ -86,9 +102,9 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 		$post_type_object = get_post_type_object( 'everest_form' );
 		$post_status      = $posts->post_status;
 
-		// Title
+		// Title.
 		$output = '<strong>';
-		if ( 'trash' == $post_status ) {
+		if ( 'trash' === $post_status ) {
 			$output .= esc_html( $title );
 		} else {
 			$output .= '<a href="' . esc_url( $edit_link ) . '" class="row-title">' . esc_html( $title ) . '</a>';
@@ -97,26 +113,29 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 
 		// Get actions.
 		if ( current_user_can( $post_type_object->cap->edit_post, $posts->ID ) && 'trash' !== $post_status ) {
-			$actions['edit'] = '<a href="' . esc_url( $edit_link ) . '">' . __( 'Edit', 'everest-forms' ) . '</a>';
+			$actions['edit']    = '<a href="' . esc_url( $edit_link ) . '">' . __( 'Edit', 'everest-forms' ) . '</a>';
 			$actions['entries'] = '<a href="' . esc_url( admin_url( 'admin.php?page=evf-entries&amp;form_id=' . $posts->ID ) ) . '">' . __( 'Entries', 'everest-forms' ) . '</a>';
 		}
 
 		if ( current_user_can( $post_type_object->cap->delete_post, $posts->ID ) ) {
-			if ( 'trash' == $post_status ) {
+			if ( 'trash' === $post_status ) {
 				$actions['untrash'] = '<a aria-label="' . esc_attr__( 'Restore this item from the Trash', 'everest-forms' ) . '" href="' . wp_nonce_url( admin_url( sprintf( $post_type_object->_edit_link . '&amp;action=untrash', $posts->ID ) ), 'untrash-post_' . $posts->ID ) . '">' . esc_html__( 'Restore', 'everest-forms' ) . '</a>';
 			} elseif ( EMPTY_TRASH_DAYS ) {
 				$actions['trash'] = '<a class="submitdelete" aria-label="' . esc_attr__( 'Move this item to the Trash', 'everest-forms' ) . '" href="' . get_delete_post_link( $posts->ID ) . '">' . esc_html__( 'Trash', 'everest-forms' ) . '</a>';
 			}
-			if ( 'trash' == $post_status || ! EMPTY_TRASH_DAYS ) {
+			if ( 'trash' === $post_status || ! EMPTY_TRASH_DAYS ) {
 				$actions['delete'] = '<a class="submitdelete" aria-label="' . esc_attr__( 'Delete this item permanently', 'everest-forms' ) . '" href="' . get_delete_post_link( $posts->ID, '', true ) . '">' . esc_html__( 'Delete permanently', 'everest-forms' ) . '</a>';
 			}
 		}
 
 		if ( current_user_can( $post_type_object->cap->edit_post, $posts->ID ) ) {
-			$preview_link   = add_query_arg( array(
-				'form_id'     => absint( $posts->ID ),
-				'evf_preview' => 'true',
-			), home_url() );
+			$preview_link   = add_query_arg(
+				array(
+					'form_id'     => absint( $posts->ID ),
+					'evf_preview' => 'true',
+				),
+				home_url()
+			);
 			$duplicate_link = wp_nonce_url( admin_url( 'admin.php?page=evf-builder&action=duplicate_form&form_id=' . absint( $posts->ID ) ), 'everest-forms-duplicate-form_' . $posts->ID );
 
 			if ( 'trash' !== $post_status ) {
@@ -142,10 +161,10 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	/**
 	 * Return shortcode column.
 	 *
-	 * @param  object $post Form object.
+	 * @param  object $posts Form object.
 	 * @return string
 	 */
-	function column_shortcode( $posts ) {
+	public function column_shortcode( $posts ) {
 		$shortcode = '[everest_form id="' . $posts->ID . '"]';
 
 		return sprintf( '<span class="shortcode"><input type="text" onfocus="this.select();" readonly="readonly" value=\'%s\' class="large-text code"></span>', $shortcode );
@@ -154,10 +173,10 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	/**
 	 * Return author column.
 	 *
-	 * @param  object $post Form object.
+	 * @param  object $posts Form object.
 	 * @return string
 	 */
-	function column_author( $posts ) {
+	public function column_author( $posts ) {
 		$user = get_user_by( 'id', $posts->post_author );
 
 		if ( ! $user ) {
@@ -167,9 +186,14 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 		$user_name = ! empty( $user->data->display_name ) ? $user->data->display_name : $user->data->user_login;
 
 		if ( current_user_can( 'edit_user' ) ) {
-			return '<a href="' . esc_url( add_query_arg( array(
-				'user_id' => $user->ID,
-			), admin_url( 'user-edit.php' ) ) ) . '">' . esc_html( $user_name ) . '</a>';
+			return '<a href="' . esc_url(
+				add_query_arg(
+					array(
+						'user_id' => $user->ID,
+					),
+					admin_url( 'user-edit.php' )
+				)
+			) . '">' . esc_html( $user_name ) . '</a>';
 		}
 
 		return esc_html( $user_name );
@@ -178,27 +202,32 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	/**
 	 * Return date column.
 	 *
-	 * @param  object $post Form object.
+	 * @param  object $posts Form object.
 	 * @return string
 	 */
-	function column_date( $posts ) {
+	public function column_date( $posts ) {
 		$post = get_post( $posts->ID );
 
 		if ( ! $post ) {
 			return;
 		}
 
-		$t_time = mysql2date( __( 'Y/m/d g:i:s A', 'everest-forms' ),
-			$post->post_date, true );
+		$t_time = mysql2date(
+			__( 'Y/m/d g:i:s A', 'everest-forms' ),
+			$post->post_date,
+			true
+		);
 		$m_time = $post->post_date;
-		$time   = mysql2date( 'G', $post->post_date )
-		          - get_option( 'gmt_offset' ) * 3600;
+		$time   = mysql2date( 'G', $post->post_date ) - get_option( 'gmt_offset' ) * 3600;
 
 		$time_diff = time() - $time;
 
 		if ( $time_diff > 0 && $time_diff < 24 * 60 * 60 ) {
 			$h_time = sprintf(
-				__( '%s ago', 'everest-forms' ), human_time_diff( $time ) );
+				/* translators: %s: Time */
+				__( '%s ago', 'everest-forms' ),
+				human_time_diff( $time )
+			);
 		} else {
 			$h_time = mysql2date( __( 'Y/m/d', 'everest-forms' ), $m_time );
 		}
@@ -209,7 +238,7 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	/**
 	 * Return entries count.
 	 *
-	 * @param  object $post Form object.
+	 * @param  object $posts Form object.
 	 * @return string
 	 */
 	public function column_entries( $posts ) {
@@ -217,55 +246,11 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 
 		$entries = count( $wpdb->get_results( $wpdb->prepare( "SELECT form_id FROM {$wpdb->prefix}evf_entries WHERE `status` != 'trash' AND form_id = %d", $posts->ID ) ) ); // WPCS: cache ok, DB call ok.
 
-		if ( isset( $_GET['status'] ) && 'trash' === $_GET['status'] ) {
+		if ( isset( $_GET['status'] ) && 'trash' === $_GET['status'] ) { // phpcs:ignore WordPress.Security.NonceVerification
 			return '<strong>' . absint( $entries ) . '</strong>';
 		} else {
 			return '<a href="' . esc_url( admin_url( 'admin.php?page=evf-entries&amp;form_id=' . $posts->ID ) ) . '">' . absint( $entries ) . '</a>';
 		}
-	}
-
-	/**
-	 * Get the status label for forms.
-	 *
-	 * @param string $status_name Status name.
-	 * @param int    $amount      Amount of forms.
-	 * @return array
-	 */
-	private function get_status_label( $status_name, $status ) {
-		switch ( $status_name ) {
-			case 'publish' :
-				/* translators: %s: count */
-				$label = array(
-					'singular' => __( 'Published <span class="count">(%s)</span>', 'everest-forms' ),
-					'plural'   => __( 'Published <span class="count">(%s)</span>', 'everest-forms' ),
-					'context'  => '',
-					'domain'   => 'everest-forms',
-				);
-				break;
-			case 'draft' :
-				/* translators: %s: count */
-				$label = array(
-					'singular' => __( 'Draft <span class="count">(%s)</span>', 'everest-forms' ),
-					'plural'   => __( 'Draft <span class="count">(%s)</span>', 'everest-forms' ),
-					'context'  => '',
-					'domain'   => 'everest-forms',
-				);
-				break;
-			case 'pending' :
-				/* translators: %s: count */
-				$label = array(
-					'singular' => __( 'Pending <span class="count">(%s)</span>', 'everest-forms' ),
-					'plural'   => __( 'Pending <span class="count">(%s)</span>', 'everest-forms' ),
-					'context'  => '',
-					'domain'   => 'everest-forms',
-				);
-				break;
-			default:
-				$label = $status->label_count;
-				break;
-		}
-
-		return $label;
 	}
 
 	/**
@@ -276,42 +261,97 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	protected function get_views() {
 		$status_links = array();
 		$num_posts    = wp_count_posts( 'everest_form', 'readable' );
-		$class        = '';
 		$total_posts  = array_sum( (array) $num_posts );
+		$all_args     = array( 'page' => 'evf-builder' );
 
+		$class = '';
 
 		// Subtract post types that are not included in the admin all list.
 		$post_stati = get_post_stati( array( 'show_in_admin_all_list' => false ) );
 		foreach ( $post_stati as $state ) {
-			$total_posts -= isset( $num_posts->$state ) ? $num_posts->$state : 0;
+			$total_posts -= $num_posts->$state;
 		}
 
-		$class = empty( $class ) && empty( $_REQUEST['status'] ) ? ' class="current"' : '';
-		/* translators: %s: count */
-		$status_links['all'] = "<a href='admin.php?page=evf-builder'$class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'posts', 'everest-forms' ), number_format_i18n( $total_posts ) ) . '</a>';
+		if ( empty( $class ) && empty( $_REQUEST['status'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$class = 'current';
+		}
+
+		$all_inner_html = sprintf(
+			/* translators: %s: count */
+			_nx(
+				'All <span class="count">(%s)</span>',
+				'All <span class="count">(%s)</span>',
+				$total_posts,
+				'posts',
+				'everest-forms'
+			),
+			number_format_i18n( $total_posts )
+		);
+
+		$status_links['all'] = $this->get_edit_link( $all_args, $all_inner_html, $class );
 
 		foreach ( get_post_stati( array( 'show_in_admin_status_list' => true ), 'objects' ) as $status ) {
 			$class       = '';
 			$status_name = $status->name;
 
-			if ( ! in_array( $status_name, array( 'publish', 'draft', 'pending', 'trash', 'future', 'private', 'auto-draft' ) ) ) {
+			if ( ! in_array( $status_name, array( 'publish', 'draft', 'pending', 'trash', 'future', 'private', 'auto-draft' ), true ) || empty( $num_posts->$status_name ) ) {
 				continue;
 			}
 
-			if ( empty( $num_posts->$status_name ) ) {
-				continue;
+			if ( isset( $_REQUEST['status'] ) && $status_name === $_REQUEST['status'] ) { // phpcs:ignore WordPress.Security.NonceVerification
+				$class = 'current';
 			}
 
-			if ( isset( $_REQUEST['status'] ) && $status_name == $_REQUEST['status'] ) {
-				$class = ' class="current"';
-			}
+			$status_args = array(
+				'page'   => 'evf-builder',
+				'status' => $status_name,
+			);
 
-			$label = $this->get_status_label( $status_name, $status );
+			$status_label = sprintf(
+				translate_nooped_plural( $status->label_count, $num_posts->$status_name ),
+				number_format_i18n( $num_posts->$status_name )
+			);
 
-			$status_links[ $status_name ] = "<a href='admin.php?page=evf-builder&amp;status=$status_name'$class>" . sprintf( translate_nooped_plural( $label, $num_posts->$status_name ), number_format_i18n( $num_posts->$status_name ) ) . '</a>';
+			$status_links[ $status_name ] = $this->get_edit_link( $status_args, $status_label, $class );
 		}
 
 		return $status_links;
+	}
+
+	/**
+	 * Helper to create links to admin.php with params.
+	 *
+	 * @since 1.5.3
+	 *
+	 * @param string[] $args  Associative array of URL parameters for the link.
+	 * @param string   $label Link text.
+	 * @param string   $class Optional. Class attribute. Default empty string.
+	 * @return string  The formatted link string.
+	 */
+	protected function get_edit_link( $args, $label, $class = '' ) {
+		$url = add_query_arg( $args, 'admin.php' );
+
+		$class_html   = '';
+		$aria_current = '';
+
+		if ( ! empty( $class ) ) {
+			$class_html = sprintf(
+				' class="%s"',
+				esc_attr( $class )
+			);
+
+			if ( 'current' === $class ) {
+				$aria_current = ' aria-current="page"';
+			}
+		}
+
+		return sprintf(
+			'<a href="%s"%s%s>%s</a>',
+			esc_url( $url ),
+			$class_html,
+			$aria_current,
+			$label
+		);
 	}
 
 	/**
@@ -320,7 +360,7 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	 * @return array
 	 */
 	protected function get_bulk_actions() {
-		if ( isset( $_GET['status'] ) && 'trash' == $_GET['status'] ) {
+		if ( isset( $_GET['status'] ) && 'trash' === $_GET['status'] ) { // phpcs:ignore WordPress.Security.NonceVerification
 			return array(
 				'untrash' => __( 'Restore', 'everest-forms' ),
 				'delete'  => __( 'Delete permanently', 'everest-forms' ),
@@ -398,17 +438,16 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 	/**
 	 * Extra controls to be displayed between bulk actions and pagination.
 	 *
-	 * @param string $which
+	 * @param string $which The location of the extra table nav markup.
 	 */
 	protected function extra_tablenav( $which ) {
 		$num_posts = wp_count_posts( 'everest_form', 'readable' );
 
-		if ( $num_posts->trash && isset( $_GET['status'] ) && 'trash' == $_GET['status'] && current_user_can( 'delete_posts' ) ) {
+		if ( $num_posts->trash && isset( $_GET['status'] ) && 'trash' === $_GET['status'] && current_user_can( 'delete_posts' ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			echo '<div class="alignleft actions">';
 				submit_button( __( 'Empty Trash', 'everest-forms' ), 'apply', 'delete_all', false );
 			echo '</div>';
 		}
-
 	}
 
 	/**
@@ -418,7 +457,7 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 		$per_page     = $this->get_items_per_page( 'evf_forms_per_page' );
 		$current_page = $this->get_pagenum();
 
-		// Query args
+		// Query args.
 		$args = array(
 			'post_type'           => 'everest_form',
 			'posts_per_page'      => $per_page,
@@ -426,24 +465,30 @@ class EVF_Admin_Forms_Table_List extends WP_List_Table {
 			'paged'               => $current_page,
 		);
 
-		// Handle the status query
-		if ( ! empty( $_REQUEST['status'] ) ) {
-			$args['post_status'] = sanitize_text_field( $_REQUEST['status'] );
+		// Handle the status query.
+		if ( ! empty( $_REQUEST['status'] ) ) { // WPCS: input var ok, CSRF ok.
+			$args['post_status'] = sanitize_text_field( $_REQUEST['status'] ); // WPCS: input var ok, sanitization ok.
 		}
 
-		$args['s']       = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : '';
-		$args['orderby'] = isset( $_REQUEST['orderby'] ) ? sanitize_text_field( $_REQUEST['orderby'] ) : 'date_created';
-		$args['order']   = isset( $_REQUEST['order'] ) && 'ASC' === strtoupper( $_REQUEST['order'] ) ? 'ASC' : 'DESC';
+		// Handle the search query.
+		if ( ! empty( $_REQUEST['s'] ) ) { // WPCS: input var ok, CSRF ok.
+			$args['s'] = sanitize_text_field( trim( wp_unslash( $_REQUEST['s'] ) ) ); // WPCS: sanitization ok, CSRF ok.
+		}
 
-		// Get the registrations
+		$args['orderby'] = isset( $_REQUEST['orderby'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ) : 'date_created'; // WPCS: sanitization ok, CSRF ok.
+		$args['order']   = isset( $_REQUEST['order'] ) && 'ASC' === strtoupper( wp_unslash( $_REQUEST['order'] ) ) ? 'ASC' : 'DESC'; // WPCS: sanitization ok, CSRF ok.
+
+		// Get the forms.
 		$posts       = new WP_Query( $args );
 		$this->items = $posts->posts;
 
-		// Set the pagination
-		$this->set_pagination_args( array(
-			'total_items' => $posts->found_posts,
-			'per_page'    => $per_page,
-			'total_pages' => $posts->max_num_pages,
-		) );
+		// Set the pagination.
+		$this->set_pagination_args(
+			array(
+				'total_items' => $posts->found_posts,
+				'per_page'    => $per_page,
+				'total_pages' => $posts->max_num_pages,
+			)
+		);
 	}
 }

@@ -1,0 +1,7 @@
+{
+  "extends": [
+    "config:base"
+  ],
+  "labels": [ "Renovate" ],
+  "schedule": "before 3am on Monday"
+}

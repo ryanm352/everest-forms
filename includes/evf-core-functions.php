@@ -11,10 +11,10 @@
 defined( 'ABSPATH' ) || exit;
 
 // Include core functions (available in both admin and frontend).
-include EVF_ABSPATH . 'includes/evf-conditional-functions.php';
+require EVF_ABSPATH . 'includes/evf-conditional-functions.php';
 require EVF_ABSPATH . 'includes/evf-deprecated-functions.php';
-include EVF_ABSPATH . 'includes/evf-formatting-functions.php';
-include EVF_ABSPATH . 'includes/evf-entry-functions.php';
+require EVF_ABSPATH . 'includes/evf-formatting-functions.php';
+require EVF_ABSPATH . 'includes/evf-entry-functions.php';
 
 /**
  * Define a constant if it is not already defined.
@@ -30,31 +30,43 @@ function evf_maybe_define_constant( $name, $value ) {
 }
 
 /**
- * Get template part (for templates like the shop-loop).
+ * Get template part.
  *
  * EVF_TEMPLATE_DEBUG_MODE will prevent overrides in themes from taking priority.
  *
- * @access public
- *
- * @param mixed  $slug
- * @param string $name (default: '')
+ * @param mixed  $slug Template slug.
+ * @param string $name Template name (default: '').
  */
 function evf_get_template_part( $slug, $name = '' ) {
-	$template = '';
+	$cache_key = sanitize_key( implode( '-', array( 'template-part', $slug, $name, EVF_VERSION ) ) );
+	$template  = (string) wp_cache_get( $cache_key, 'everest-forms' );
 
-	// Look in yourtheme/slug-name.php and yourtheme/everest-forms/slug-name.php
-	if ( $name && ! EVF_TEMPLATE_DEBUG_MODE ) {
-		$template = locate_template( array( "{$slug}-{$name}.php", EVF()->template_path() . "{$slug}-{$name}.php" ) );
-	}
+	if ( ! $template ) {
+		if ( $name ) {
+			$template = EVF_TEMPLATE_DEBUG_MODE ? '' : locate_template(
+				array(
+					"{$slug}-{$name}.php",
+					evf()->template_path() . "{$slug}-{$name}.php",
+				)
+			);
 
-	// Get default slug-name.php
-	if ( ! $template && $name && file_exists( EVF()->plugin_path() . "/templates/{$slug}-{$name}.php" ) ) {
-		$template = EVF()->plugin_path() . "/templates/{$slug}-{$name}.php";
-	}
+			if ( ! $template ) {
+				$fallback = evf()->plugin_path() . "/templates/{$slug}-{$name}.php";
+				$template = file_exists( $fallback ) ? $fallback : '';
+			}
+		}
 
-	// If template file doesn't exist, look in yourtheme/slug.php and yourtheme/everest-forms/slug.php
-	if ( ! $template && ! EVF_TEMPLATE_DEBUG_MODE ) {
-		$template = locate_template( array( "{$slug}.php", EVF()->template_path() . "{$slug}.php" ) );
+		if ( ! $template ) {
+			// If template file doesn't exist, look in yourtheme/slug.php and yourtheme/everest-forms/slug.php.
+			$template = EVF_TEMPLATE_DEBUG_MODE ? '' : locate_template(
+				array(
+					"{$slug}.php",
+					evf()->template_path() . "{$slug}.php",
+				)
+			);
+		}
+
+		wp_cache_set( $cache_key, $template, 'everest-forms' );
 	}
 
 	// Allow 3rd party plugins to filter template file from their plugin.
@@ -68,53 +80,72 @@ function evf_get_template_part( $slug, $name = '' ) {
 /**
  * Get other templates passing attributes and including the file.
  *
- * @access public
- *
- * @param string $template_name
- * @param array  $args          (default: array())
- * @param string $template_path (default: '')
- * @param string $default_path  (default: '')
+ * @param string $template_name Template name.
+ * @param array  $args          Arguments. (default: array).
+ * @param string $template_path Template path. (default: '').
+ * @param string $default_path  Default path. (default: '').
  */
 function evf_get_template( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
-	if ( ! empty( $args ) && is_array( $args ) ) {
-		extract( $args );
-	}
+	$cache_key = sanitize_key( implode( '-', array( 'template', $template_name, $template_path, $default_path, EVF_VERSION ) ) );
+	$template  = (string) wp_cache_get( $cache_key, 'everest-forms' );
 
-	$located = evf_locate_template( $template_name, $template_path, $default_path );
-
-	if ( ! file_exists( $located ) ) {
-		_doing_it_wrong( __FUNCTION__, sprintf( __( '%s does not exist.', 'everest-forms' ), '<code>' . $located . '</code>' ), '1.0.0' );
-
-		return;
+	if ( ! $template ) {
+		$template = evf_locate_template( $template_name, $template_path, $default_path );
+		wp_cache_set( $cache_key, $template, 'everest-forms' );
 	}
 
 	// Allow 3rd party plugin filter template file from their plugin.
-	$located = apply_filters( 'evf_get_template', $located, $template_name, $args, $template_path, $default_path );
+	$filter_template = apply_filters( 'evf_get_template', $template, $template_name, $args, $template_path, $default_path );
 
-	do_action( 'everest_forms_before_template_part', $template_name, $template_path, $located, $args );
+	if ( $filter_template !== $template ) {
+		if ( ! file_exists( $filter_template ) ) {
+			/* translators: %s template */
+			evf_doing_it_wrong( __FUNCTION__, sprintf( __( '%s does not exist.', 'everest-forms' ), '<code>' . $template . '</code>' ), '1.0.0' );
+			return;
+		}
+		$template = $filter_template;
+	}
 
-	include( $located );
+	$action_args = array(
+		'template_name' => $template_name,
+		'template_path' => $template_path,
+		'located'       => $template,
+		'args'          => $args,
+	);
 
-	do_action( 'everest_forms_after_template_part', $template_name, $template_path, $located, $args );
+	if ( ! empty( $args ) && is_array( $args ) ) {
+		if ( isset( $args['action_args'] ) ) {
+			evf_doing_it_wrong(
+				__FUNCTION__,
+				__( 'action_args should not be overwritten when calling evf_get_template.', 'everest-forms' ),
+				'1.4.9'
+			);
+			unset( $args['action_args'] );
+		}
+		extract( $args ); // @codingStandardsIgnoreLine
+	}
+
+	do_action( 'everest_forms_before_template_part', $action_args['template_name'], $action_args['template_path'], $action_args['located'], $action_args['args'] );
+
+	include $action_args['located'];
+
+	do_action( 'everest_forms_after_template_part', $action_args['template_name'], $action_args['template_path'], $action_args['located'], $action_args['args'] );
 }
 
 /**
  * Like evf_get_template, but returns the HTML instead of outputting.
  *
- * @see   evf_get_template
- * @since      1.0.0
- *
- * @param string $template_name
- * @param array  $args
- * @param string $template_path
- * @param string $default_path
- *
+ * @see    evf_get_template
+ * @since  1.0.0
+ * @param  string $template_name Template name.
+ * @param  array  $args          Arguments. (default: array).
+ * @param  string $template_path Template path. (default: '').
+ * @param  string $default_path  Default path. (default: '').
  * @return string
  */
 function evf_get_template_html( $template_name, $args = array(), $template_path = '', $default_path = '' ) {
 	ob_start();
 	evf_get_template( $template_name, $args, $template_path, $default_path );
-
 	return ob_get_clean();
 }
 
@@ -123,25 +154,22 @@ function evf_get_template_html( $template_name, $args = array(), $template_path 
  *
  * This is the load order:
  *
- *        yourtheme        /    $template_path    /    $template_name
- *        yourtheme        /    $template_name
- *        $default_path    /    $template_name
+ * yourtheme/$template_path/$template_name
+ * yourtheme/$template_name
+ * $default_path/$template_name
  *
- * @access public
- *
- * @param string $template_name
- * @param string $template_path (default: '')
- * @param string $default_path  (default: '')
- *
+ * @param  string $template_name Template name.
+ * @param  string $template_path Template path. (default: '').
+ * @param  string $default_path  Default path. (default: '').
  * @return string
  */
 function evf_locate_template( $template_name, $template_path = '', $default_path = '' ) {
 	if ( ! $template_path ) {
-		$template_path = EVF()->template_path();
+		$template_path = evf()->template_path();
 	}
 
 	if ( ! $default_path ) {
-		$default_path = EVF()->plugin_path() . '/templates/';
+		$default_path = evf()->plugin_path() . '/templates/';
 	}
 
 	// Look within passed path within the theme - this is priority.
@@ -152,7 +180,7 @@ function evf_locate_template( $template_name, $template_path = '', $default_path
 		)
 	);
 
-	// Get default template/
+	// Get default template/.
 	if ( ! $template || EVF_TEMPLATE_DEBUG_MODE ) {
 		$template = $default_path . $template_name;
 	}
@@ -164,13 +192,13 @@ function evf_locate_template( $template_name, $template_path = '', $default_path
 /**
  * Send HTML emails from EverestForms.
  *
- * @param mixed  $to
- * @param mixed  $subject
- * @param mixed  $message
- * @param string $headers     (default: "Content-Type: text/html\r\n")
- * @param string $attachments (default: "")
+ * @param mixed  $to          Receiver.
+ * @param mixed  $subject     Subject.
+ * @param mixed  $message     Message.
+ * @param string $headers     Headers. (default: "Content-Type: text/html\r\n").
+ * @param string $attachments Attachments. (default: "").
  */
-function evf_mail( $to, $subject, $message, $headers = "Content-Type: text/html\r\n", $attachments = "" ) {
+function evf_mail( $to, $subject, $message, $headers = "Content-Type: text/html\r\n", $attachments = '' ) {
 	$mailer = EVF()->mailer();
 
 	$mailer->send( $to, $subject, $message, $headers, $attachments );
@@ -179,7 +207,7 @@ function evf_mail( $to, $subject, $message, $headers = "Content-Type: text/html\
 /**
  * Queue some JavaScript code to be output in the footer.
  *
- * @param string $code
+ * @param string $code Code.
  */
 function evf_enqueue_js( $code ) {
 	global $evf_queued_js;
@@ -211,7 +239,7 @@ function evf_print_js() {
 		 * @since 1.0.0
 		 * @param string $js JavaScript code.
 		 */
-		echo apply_filters( 'everest_forms_queued_js', $js );
+		echo apply_filters( 'everest_forms_queued_js', $js ); // WPCS: XSS ok.
 
 		unset( $evf_queued_js );
 	}
@@ -224,13 +252,14 @@ function evf_print_js() {
  * @param  string  $value  Value of the cookie.
  * @param  integer $expire Expiry of the cookie.
  * @param  bool    $secure Whether the cookie should be served only over https.
+ * @param  bool    $httponly Whether the cookie is only accessible over HTTP, not scripting languages like JavaScript. @since 1.4.9.
  */
-function evf_setcookie( $name, $value, $expire = 0, $secure = false ) {
+function evf_setcookie( $name, $value, $expire = 0, $secure = false, $httponly = false ) {
 	if ( ! headers_sent() ) {
-		setcookie( $name, $value, $expire, COOKIEPATH ? COOKIEPATH : '/', COOKIE_DOMAIN, $secure );
+		setcookie( $name, $value, $expire, COOKIEPATH ? COOKIEPATH : '/', COOKIE_DOMAIN, $secure, apply_filters( 'everest_forms_cookie_httponly', $httponly, $name, $value, $expire, $secure ) );
 	} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 		headers_sent( $file, $line );
-		trigger_error( "{$name} cookie cannot be set - headers already sent by {$file} on line {$line}", E_USER_NOTICE );
+		trigger_error( "{$name} cookie cannot be set - headers already sent by {$file} on line {$line}", E_USER_NOTICE ); // @codingStandardsIgnoreLine
 	}
 }
 
@@ -270,18 +299,19 @@ function evf_get_csv_file_name( $handle ) {
 /**
  * Recursively get page children.
  *
- * @param  int $page_id
- *
+ * @param  int $page_id Page ID.
  * @return int[]
  */
 function evf_get_page_children( $page_id ) {
-	$page_ids = get_posts( array(
-		'post_parent' => $page_id,
-		'post_type'   => 'page',
-		'numberposts' => - 1,
-		'post_status' => 'any',
-		'fields'      => 'ids',
-	) );
+	$page_ids = get_posts(
+		array(
+			'post_parent' => $page_id,
+			'post_type'   => 'page',
+			'numberposts' => - 1,
+			'post_status' => 'any',
+			'fields'      => 'ids',
+		)
+	);
 
 	if ( ! empty( $page_ids ) ) {
 		foreach ( $page_ids as $page_id ) {
@@ -294,11 +324,12 @@ function evf_get_page_children( $page_id ) {
 
 /**
  * Get user agent string.
- * @since      1.0.0
+ *
+ * @since  1.0.0
  * @return string
  */
 function evf_get_user_agent() {
-	return isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
+	return isset( $_SERVER['HTTP_USER_AGENT'] ) ? evf_clean( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : ''; // @codingStandardsIgnoreLine
 }
 
 // This function can be removed when WP 3.9.2 or greater is required.
@@ -309,11 +340,10 @@ if ( ! function_exists( 'hash_equals' ) ) :
 	 * This function was added in PHP 5.6.
 	 * It can leak the length of a string.
 	 *
-	 * @since      1.0.0
+	 * @since 1.0.0
 	 *
-	 * @param string $a Expected string.
-	 * @param string $b Actual string.
-	 *
+	 * @param  string $a Expected string.
+	 * @param  string $b Actual string.
 	 * @return bool Whether strings are equal.
 	 */
 	function hash_equals( $a, $b ) {
@@ -335,23 +365,22 @@ endif;
 /**
  * Generate a rand hash.
  *
- * @since      1.0.0
+ * @since  1.0.0
  * @return string
  */
 function evf_rand_hash() {
-	if ( function_exists( 'openssl_random_pseudo_bytes' ) ) {
-		return bin2hex( openssl_random_pseudo_bytes( 20 ) );
-	} else {
+	if ( ! function_exists( 'openssl_random_pseudo_bytes' ) ) {
 		return sha1( wp_rand() );
 	}
+
+	return bin2hex( openssl_random_pseudo_bytes( 20 ) ); // @codingStandardsIgnoreLine
 }
 
 /**
  * Find all possible combinations of values from the input array and return in a logical order.
- * @since      1.0.0
  *
- * @param array $input
- *
+ * @since  1.0.0
+ * @param  array $input Input.
  * @return array
  */
 function evf_array_cartesian( $input ) {
@@ -360,30 +389,29 @@ function evf_array_cartesian( $input ) {
 	$indexes = array();
 	$index   = 0;
 
-	// Generate indexes from keys and values so we have a logical sort order
+	// Generate indexes from keys and values so we have a logical sort order.
 	foreach ( $input as $key => $values ) {
 		foreach ( $values as $value ) {
-			$indexes[ $key ][ $value ] = $index ++;
+			$indexes[ $key ][ $value ] = $index++;
 		}
 	}
 
-	// Loop over the 2D array of indexes and generate all combinations
+	// Loop over the 2D array of indexes and generate all combinations.
 	foreach ( $indexes as $key => $values ) {
-		// When result is empty, fill with the values of the first looped array
+		// When result is empty, fill with the values of the first looped array.
 		if ( empty( $results ) ) {
 			foreach ( $values as $value ) {
 				$results[] = array( $key => $value );
 			}
-
-			// Second and subsequent input sub-array merging.
 		} else {
+			// Second and subsequent input sub-array merging.
 			foreach ( $results as $result_key => $result ) {
 				foreach ( $values as $value ) {
-					// If the key is not set, we can set it
+					// If the key is not set, we can set it.
 					if ( ! isset( $results[ $result_key ][ $key ] ) ) {
 						$results[ $result_key ][ $key ] = $value;
-						// If the key is set, we can add a new combination to the results array
 					} else {
+						// If the key is set, we can add a new combination to the results array.
 						$new_combination         = $results[ $result_key ];
 						$new_combination[ $key ] = $value;
 						$results[]               = $new_combination;
@@ -393,19 +421,19 @@ function evf_array_cartesian( $input ) {
 		}
 	}
 
-	// Sort the indexes
+	// Sort the indexes.
 	arsort( $results );
 
-	// Convert indexes back to values
+	// Convert indexes back to values.
 	foreach ( $results as $result_key => $result ) {
 		$converted_values = array();
 
-		// Sort the values
+		// Sort the values.
 		arsort( $results[ $result_key ] );
 
-		// Convert the values
+		// Convert the values.
 		foreach ( $results[ $result_key ] as $key => $value ) {
-			$converted_values[ $key ] = array_search( $value, $indexes[ $key ] );
+			$converted_values[ $key ] = array_search( $value, $indexes[ $key ], true );
 		}
 
 		$results[ $result_key ] = $converted_values;
@@ -417,26 +445,26 @@ function evf_array_cartesian( $input ) {
 /**
  * Run a MySQL transaction query, if supported.
  *
- * @param string $type start (default), commit, rollback
- *
- * @since      1.0.0
+ * @since 1.0.0
+ * @param string $type Types: start (default), commit, rollback.
+ * @param bool   $force use of transactions.
  */
-function evf_transaction_query( $type = 'start' ) {
+function evf_transaction_query( $type = 'start', $force = false ) {
 	global $wpdb;
 
 	$wpdb->hide_errors();
 
 	evf_maybe_define_constant( 'EVF_USE_TRANSACTIONS', true );
 
-	if ( EVF_USE_TRANSACTIONS ) {
+	if ( EVF_USE_TRANSACTIONS || $force ) {
 		switch ( $type ) {
-			case 'commit' :
+			case 'commit':
 				$wpdb->query( 'COMMIT' );
 				break;
-			case 'rollback' :
+			case 'rollback':
 				$wpdb->query( 'ROLLBACK' );
 				break;
-			default :
+			default:
 				$wpdb->query( 'START TRANSACTION' );
 				break;
 		}
@@ -456,11 +484,10 @@ function evf_back_link( $label, $url ) {
 /**
  * Display a EverestForms help tip.
  *
- * @since      1.0.0
+ * @since  1.0.0
  *
  * @param  string $tip        Help tip text
  * @param  bool   $allow_html Allow sanitized HTML if true or escape
- *
  * @return string
  */
 function evf_help_tip( $tip, $allow_html = false ) {
@@ -475,13 +502,13 @@ function evf_help_tip( $tip, $allow_html = false ) {
 
 /**
  * Wrapper for set_time_limit to see if it is enabled.
- * @since      1.0.0
  *
- * @param int $limit
+ * @since 1.0.0
+ * @param int $limit Time limit.
  */
 function evf_set_time_limit( $limit = 0 ) {
-	if ( function_exists( 'set_time_limit' ) && false === strpos( ini_get( 'disable_functions' ), 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
-		@set_time_limit( $limit );
+	if ( function_exists( 'set_time_limit' ) && false === strpos( ini_get( 'disable_functions' ), 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) { // phpcs:ignore PHPCompatibility.IniDirectives.RemovedIniDirectives.safe_modeDeprecatedRemoved
+		@set_time_limit( $limit ); // @codingStandardsIgnoreLine
 	}
 }
 
@@ -512,29 +539,27 @@ function evf_get_logger() {
 
 	$class = apply_filters( 'everest_forms_logging_class', 'EVF_Logger' );
 
-	if ( null === $logger || ! is_a( $logger, $class ) ) {
-		$implements = class_implements( $class );
+	if ( null !== $logger && is_string( $class ) && is_a( $logger, $class ) ) {
+		return $logger;
+	}
 
-		if ( is_array( $implements ) && in_array( 'EVF_Logger_Interface', $implements, true ) ) {
-			if ( is_object( $class ) ) {
-				$logger = $class;
-			} else {
-				$logger = new $class();
-			}
-		} else {
-			evf_doing_it_wrong(
-				__FUNCTION__,
-				sprintf(
-					/* translators: 1: class name 2: everest_forms_logging_class 3: EVF_Logger_Interface */
-					__( 'The class %1$s provided by %2$s filter must implement %3$s.', 'everest-forms' ),
-					'<code>' . esc_html( is_object( $class ) ? get_class( $class ) : $class ) . '</code>',
-					'<code>everest_forms_logging_class</code>',
-					'<code>EVF_Logger_Interface</code>'
-				),
-				'1.2'
-			);
-			$logger = is_a( $logger, 'EVF_Logger' ) ? $logger : new EVF_Logger();
-		}
+	$implements = class_implements( $class );
+
+	if ( is_array( $implements ) && in_array( 'EVF_Logger_Interface', $implements, true ) ) {
+		$logger = is_object( $class ) ? $class : new $class();
+	} else {
+		evf_doing_it_wrong(
+			__FUNCTION__,
+			sprintf(
+				/* translators: 1: class name 2: everest_forms_logging_class 3: EVF_Logger_Interface */
+				__( 'The class %1$s provided by %2$s filter must implement %3$s.', 'everest-forms' ),
+				'<code>' . esc_html( is_object( $class ) ? get_class( $class ) : $class ) . '</code>',
+				'<code>everest_forms_logging_class</code>',
+				'<code>EVF_Logger_Interface</code>'
+			),
+			'1.2'
+		);
+		$logger = is_a( $logger, 'EVF_Logger' ) ? $logger : new EVF_Logger();
 	}
 
 	return $logger;
@@ -556,10 +581,22 @@ function evf_get_logger() {
  */
 function evf_print_r( $expression, $return = false ) {
 	$alternatives = array(
-		array( 'func' => 'print_r', 'args' => array( $expression, true ) ),
-		array( 'func' => 'var_export', 'args' => array( $expression, true ) ),
-		array( 'func' => 'json_encode', 'args' => array( $expression ) ),
-		array( 'func' => 'serialize', 'args' => array( $expression ) ),
+		array(
+			'func' => 'print_r',
+			'args' => array( $expression, true ),
+		),
+		array(
+			'func' => 'var_export',
+			'args' => array( $expression, true ),
+		),
+		array(
+			'func' => 'json_encode',
+			'args' => array( $expression ),
+		),
+		array(
+			'func' => 'serialize',
+			'args' => array( $expression ),
+		),
 	);
 
 	$alternatives = apply_filters( 'everest_forms_print_r_alternatives', $alternatives, $expression );
@@ -569,11 +606,10 @@ function evf_print_r( $expression, $return = false ) {
 			$res = call_user_func_array( $alternative['func'], $alternative['args'] );
 			if ( $return ) {
 				return $res;
-			} else {
-				echo $res;
-
-				return true;
 			}
+
+			echo $res; // WPCS: XSS ok.
+			return true;
 		}
 	}
 
@@ -583,14 +619,11 @@ function evf_print_r( $expression, $return = false ) {
 /**
  * Registers the default log handler.
  *
- * @since      1.0.0
- *
- * @param array $handlers
- *
+ * @since  1.0.0
+ * @param  array $handlers Handlers.
  * @return array
  */
 function evf_register_default_log_handler( $handlers ) {
-
 	if ( defined( 'EVF_LOG_HANDLER' ) && class_exists( EVF_LOG_HANDLER ) ) {
 		$handler_class   = EVF_LOG_HANDLER;
 		$default_handler = new $handler_class();
@@ -608,17 +641,15 @@ add_filter( 'everest_forms_register_log_handlers', 'evf_register_default_log_han
 /**
  * Based on wp_list_pluck, this calls a method instead of returning a property.
  *
- * @since      1.0.0
- *
+ * @since 1.0.0
  * @param array      $list              List of objects or arrays
  * @param int|string $callback_or_field Callback method from the object to place instead of the entire object
  * @param int|string $index_key         Optional. Field from the object to use as keys for the new array.
  *                                      Default null.
- *
  * @return array Array of values.
  */
 function evf_list_pluck( $list, $callback_or_field, $index_key = null ) {
-	// Use wp_list_pluck if this isn't a callback
+	// Use wp_list_pluck if this isn't a callback.
 	$first_el = current( $list );
 	if ( ! is_object( $first_el ) || ! is_callable( array( $first_el, $callback_or_field ) ) ) {
 		return wp_list_pluck( $list, $callback_or_field, $index_key );
@@ -631,7 +662,6 @@ function evf_list_pluck( $list, $callback_or_field, $index_key = null ) {
 		foreach ( $list as $key => $value ) {
 			$list[ $key ] = $value->{$callback_or_field}();
 		}
-
 		return $list;
 	}
 
@@ -641,7 +671,7 @@ function evf_list_pluck( $list, $callback_or_field, $index_key = null ) {
 	 */
 	$newlist = array();
 	foreach ( $list as $value ) {
-		// Get index. @since      1.0.0
+		// Get index.
 		if ( is_callable( array( $value, $index_key ) ) ) {
 			$newlist[ $value->{$index_key}() ] = $value->{$callback_or_field}();
 		} elseif ( isset( $value->$index_key ) ) {
@@ -650,14 +680,13 @@ function evf_list_pluck( $list, $callback_or_field, $index_key = null ) {
 			$newlist[] = $value->{$callback_or_field}();
 		}
 	}
-
 	return $newlist;
 }
 
 /**
  * Switch EverestForms to site language.
  *
- * @since      1.0.0
+ * @since 1.0.0
  */
 function evf_switch_to_site_locale() {
 	if ( function_exists( 'switch_to_locale' ) ) {
@@ -674,7 +703,7 @@ function evf_switch_to_site_locale() {
 /**
  * Switch EverestForms language to original.
  *
- * @since      1.0.0
+ * @since 1.0.0
  */
 function evf_restore_locale() {
 	if ( function_exists( 'restore_previous_locale' ) ) {
@@ -691,11 +720,9 @@ function evf_restore_locale() {
 /**
  * Get an item of post data if set, otherwise return a default value.
  *
- * @since      1.0.0
- *
+ * @since  1.0.0
  * @param  string $key
  * @param  string $default
- *
  * @return mixed value sanitized by evf_clean
  */
 function evf_get_post_data_by_key( $key, $default = '' ) {
@@ -705,12 +732,10 @@ function evf_get_post_data_by_key( $key, $default = '' ) {
 /**
  * Get data if set, otherwise return a default value or null. Prevents notices when data is not set.
  *
- * @since      1.0.0
- *
- * @param  mixed  $var
- * @param  string $default
- *
- * @return mixed value sanitized by evf_clean
+ * @since  1.0.0
+ * @param  mixed  $var     Variable.
+ * @param  string $default Default value.
+ * @return mixed
  */
 function evf_get_var( &$var, $default = null ) {
 	return isset( $var ) ? $var : $default;
@@ -728,10 +753,15 @@ function evf_enable_evf_plugin_headers( $headers ) {
 		include_once dirname( __FILE__ ) . '/admin/plugin-updates/class-evf-plugin-updates.php';
 	}
 
-	$headers['EVFRequires'] = EVF_Plugin_Updates::VERSION_REQUIRED_HEADER;
-	$headers['EVFTested']   = EVF_Plugin_Updates::VERSION_TESTED_HEADER;
+	// EVF requires at least - allows developers to define which version of Everest Forms the plugin requires to run.
+	$headers[] = EVF_Plugin_Updates::VERSION_REQUIRED_HEADER;
+
+	// EVF tested up to - allows developers to define which version of Everest Forms they have tested up to.
+	$headers[] = EVF_Plugin_Updates::VERSION_TESTED_HEADER;
+
 	return $headers;
 }
+add_filter( 'extra_theme_headers', 'evf_enable_evf_plugin_headers' );
 add_filter( 'extra_plugin_headers', 'evf_enable_evf_plugin_headers' );
 
 /**
@@ -924,6 +954,9 @@ function evf_sanitize_textarea_field( $string ) {
 }
 
 /**
+ * Formats, sanitizes, and returns/echos HTML element ID, classes, attributes,
+ * and data attributes.
+ *
  * @param string $id
  * @param array  $class
  * @param array  $datas
@@ -933,49 +966,57 @@ function evf_sanitize_textarea_field( $string ) {
  * @return string
  */
 function evf_html_attributes( $id = '', $class = array(), $datas = array(), $atts = array(), $echo = false ) {
-
-	$output = '';
-	$id     = trim( $id );
+	$id    = trim( $id );
+	$parts = array();
 
 	if ( ! empty( $id ) ) {
-		$output = 'id="' . sanitize_html_class( $id ) . '" ';
+		$id = sanitize_html_class( $id );
+		if ( ! empty( $id ) ) {
+			$parts[] = 'id="' . $id . '"';
+		}
 	}
 
 	if ( ! empty( $class ) ) {
-		$output .= 'class="' . evf_sanitize_classes( $class, true ) . '" ';
+		$class = evf_sanitize_classes( $class, true );
+		if ( ! empty( $class ) ) {
+			$parts[] = 'class="' . $class . '"';
+		}
 	}
 
 	if ( ! empty( $datas ) ) {
 		foreach ( $datas as $data => $val ) {
-			$output .= 'data-' . sanitize_html_class( $data ) . '="' . esc_attr( $val ) . '" ';
+			$parts[] = 'data-' . sanitize_html_class( $data ) . '="' . esc_attr( $val ) . '"';
 		}
 	}
 
 	if ( ! empty( $atts ) ) {
 		foreach ( $atts as $att => $val ) {
 			if ( '0' == $val || ! empty( $val ) ) {
-				$output .= sanitize_html_class( $att ) . '="' . esc_attr( $val ) . '" ';
+				$parts[] = sanitize_html_class( $att ) . '="' . esc_attr( $val ) . '"';
 			}
 		}
 	}
 
+	$output = implode( ' ', $parts );
+
 	if ( $echo ) {
-		echo trim( $output );
+		echo trim( $output ); // phpcs:ignore
 	} else {
 		return trim( $output );
 	}
 }
 
 /**
- * @param      $classes
- * @param bool $convert
+ * Sanitizes string of CSS classes.
  *
- * @return array|string
+ * @param array|string $classes
+ * @param bool         $convert True will convert strings to array and vice versa.
+ *
+ * @return string|array
  */
 function evf_sanitize_classes( $classes, $convert = false ) {
-
-	$array = is_array( $classes );
 	$css   = array();
+	$array = is_array( $classes );
 
 	if ( ! empty( $classes ) ) {
 		if ( ! $array ) {
@@ -985,6 +1026,7 @@ function evf_sanitize_classes( $classes, $convert = false ) {
 			$css[] = sanitize_html_class( $class );
 		}
 	}
+
 	if ( $array ) {
 		return $convert ? implode( ' ', $css ) : $css;
 	} else {
@@ -995,10 +1037,9 @@ function evf_sanitize_classes( $classes, $convert = false ) {
 /**
  * Performs json_decode and unslash.
  *
- * @since      1.0.0
+ * @since 1.0.0
  *
  * @param string $data
- *
  * @return array|bool
  */
 function evf_decode( $data ) {
@@ -1055,11 +1096,11 @@ function evf_crypto_rand_secure( $min, $max ) {
  * @return string
  */
 function evf_get_random_string( $length = 10 ) {
-	$string       = "";
-	$codeAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	$codeAlphabet .= "abcdefghijklmnopqrstuvwxyz";
-	$codeAlphabet .= "0123456789";
-	$max          = strlen( $codeAlphabet ); // edited
+	$string        = '';
+	$codeAlphabet  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	$codeAlphabet .= 'abcdefghijklmnopqrstuvwxyz';
+	$codeAlphabet .= '0123456789';
+	$max           = strlen( $codeAlphabet ); // edited
 	for ( $i = 0; $i < $length; $i ++ ) {
 		$string .= $codeAlphabet[ evf_crypto_rand_secure( 0, $max - 1 ) ];
 	}
@@ -1074,8 +1115,8 @@ function evf_get_random_string( $length = 10 ) {
  * @return array of form data.
  */
 function evf_get_all_forms( $skip_disabled_entries = false ) {
-	$forms     = array();
-	$form_ids  = wp_parse_id_list(
+	$forms    = array();
+	$form_ids = wp_parse_id_list(
 		get_posts(
 			array(
 				'post_type'   => 'everest_form',
@@ -1138,81 +1179,81 @@ function evf_get_ip_address() {
  * @return array
  */
 function evf_get_browser() {
-    $u_agent  = $_SERVER['HTTP_USER_AGENT'];
-    $bname    = 'Unknown';
-    $platform = 'Unknown';
-    $version  = '';
+	$u_agent  = $_SERVER['HTTP_USER_AGENT'];
+	$bname    = 'Unknown';
+	$platform = 'Unknown';
+	$version  = '';
 
-    // First get the platform.
-    if ( preg_match( '/linux/i', $u_agent ) ) {
-        $platform = 'Linux';
-    } elseif ( preg_match( '/macintosh|mac os x/i', $u_agent ) ) {
-        $platform = 'MAC OS';
-    } elseif ( preg_match( '/windows|win32/i', $u_agent ) ) {
-        $platform = 'Windows';
-    }
+	// First get the platform.
+	if ( preg_match( '/linux/i', $u_agent ) ) {
+		$platform = 'Linux';
+	} elseif ( preg_match( '/macintosh|mac os x/i', $u_agent ) ) {
+		$platform = 'MAC OS';
+	} elseif ( preg_match( '/windows|win32/i', $u_agent ) ) {
+		$platform = 'Windows';
+	}
 
-    // Next get the name of the useragent yes seperately and for good reason.
-    if ( preg_match( '/MSIE/i',$u_agent ) && ! preg_match( '/Opera/i',$u_agent ) ) {
-        $bname = 'Internet Explorer';
-        $ub    = 'MSIE';
-    } elseif ( preg_match( '/Trident/i',$u_agent ) ) {
-        // this condition is for IE11
-        $bname = 'Internet Explorer';
-        $ub = 'rv';
-    } elseif ( preg_match( '/Firefox/i',$u_agent ) ) {
-        $bname = 'Mozilla Firefox';
-        $ub = 'Firefox';
-    } elseif ( preg_match( '/Chrome/i',$u_agent ) ) {
-        $bname = 'Google Chrome';
-        $ub = 'Chrome';
-    } elseif ( preg_match( '/Safari/i',$u_agent ) ) {
-        $bname = 'Apple Safari';
-        $ub = 'Safari';
-    } elseif ( preg_match( '/Opera/i',$u_agent ) ) {
-        $bname = 'Opera';
-        $ub = 'Opera';
-    } elseif ( preg_match( '/Netscape/i',$u_agent ) ) {
-        $bname = 'Netscape';
-        $ub = 'Netscape';
-    }
+	// Next get the name of the useragent yes seperately and for good reason.
+	if ( preg_match( '/MSIE/i', $u_agent ) && ! preg_match( '/Opera/i', $u_agent ) ) {
+		$bname = 'Internet Explorer';
+		$ub    = 'MSIE';
+	} elseif ( preg_match( '/Trident/i', $u_agent ) ) {
+		// this condition is for IE11
+		$bname = 'Internet Explorer';
+		$ub    = 'rv';
+	} elseif ( preg_match( '/Firefox/i', $u_agent ) ) {
+		$bname = 'Mozilla Firefox';
+		$ub    = 'Firefox';
+	} elseif ( preg_match( '/Chrome/i', $u_agent ) ) {
+		$bname = 'Google Chrome';
+		$ub    = 'Chrome';
+	} elseif ( preg_match( '/Safari/i', $u_agent ) ) {
+		$bname = 'Apple Safari';
+		$ub    = 'Safari';
+	} elseif ( preg_match( '/Opera/i', $u_agent ) ) {
+		$bname = 'Opera';
+		$ub    = 'Opera';
+	} elseif ( preg_match( '/Netscape/i', $u_agent ) ) {
+		$bname = 'Netscape';
+		$ub    = 'Netscape';
+	}
 
-    // Finally get the correct version number.
-    // Added "|:"
-    $known = array( 'Version', $ub, 'other' );
-    $pattern = '#(?<browser>' . join( '|', $known ) .
-     ')[/|: ]+(?<version>[0-9.|a-zA-Z.]*)#';
-    if ( ! preg_match_all( $pattern, $u_agent, $matches ) ) {
-        // We have no matching number just continue.
-    }
+	// Finally get the correct version number.
+	// Added "|:"
+	$known   = array( 'Version', $ub, 'other' );
+	$pattern = '#(?<browser>' . join( '|', $known ) .
+	 ')[/|: ]+(?<version>[0-9.|a-zA-Z.]*)#';
+	if ( ! preg_match_all( $pattern, $u_agent, $matches ) ) {
+		// We have no matching number just continue.
+	}
 
-    // See how many we have.
-    $i = count( $matches['browser'] );
+	// See how many we have.
+	$i = count( $matches['browser'] );
 
-    if ( $i != 1 ) {
-        // we will have two since we are not using 'other' argument yet.
-        // see if version is before or after the name.
-        if ( strripos( $u_agent,'Version' ) < strripos( $u_agent,$ub ) ) {
-            $version = $matches['version'][0];
-        } else {
-            $version = $matches['version'][1];
-        }
-    } else {
-        $version = $matches['version'][0];
-    }
+	if ( $i != 1 ) {
+		// we will have two since we are not using 'other' argument yet.
+		// see if version is before or after the name.
+		if ( strripos( $u_agent, 'Version' ) < strripos( $u_agent, $ub ) ) {
+			$version = $matches['version'][0];
+		} else {
+			$version = $matches['version'][1];
+		}
+	} else {
+		$version = $matches['version'][0];
+	}
 
-    // Check if we have a number.
-    if ( $version == null || $version == '' ) {
-        $version = '';
-    }
+	// Check if we have a number.
+	if ( $version == null || $version == '' ) {
+		$version = '';
+	}
 
-    return array(
-        'userAgent' => $u_agent,
-        'name'      => $bname,
-        'version'   => $version,
-        'platform'  => $platform,
-        'pattern'   => $pattern
-    );
+	return array(
+		'userAgent' => $u_agent,
+		'name'      => $bname,
+		'version'   => $version,
+		'platform'  => $platform,
+		'pattern'   => $pattern,
+	);
 }
 
 /**
@@ -1256,13 +1297,36 @@ function evf_get_day_period_date( $period, $timestamp = '', $format = 'Y-m-d H:i
  */
 function evf_get_form_data_by_meta_key( $form_id, $meta_key ) {
 	$get_post     = get_post( $form_id );
-	$post_content = json_decode( $get_post->post_content, true ) ;
+	$post_content = json_decode( $get_post->post_content, true );
 	$form_fields  = isset( $post_content['form_fields'] ) ? $post_content['form_fields'] : array();
 
 	if ( ! empty( $form_fields ) ) {
-		foreach( $form_fields as $field ) {
+		foreach ( $form_fields as $field ) {
 			if ( isset( $field['meta-key'] ) && $meta_key == $field['meta-key'] ) {
 				return $field['label'];
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Get field type by meta key
+ *
+ * @param  $form_id  Form ID
+ * @param  $meta_key Field's meta key
+ * @return mixed
+ */
+function evf_get_field_type_by_meta_key( $form_id, $meta_key ) {
+	$get_post     = get_post( $form_id );
+	$post_content = json_decode( $get_post->post_content, true );
+	$form_fields  = isset( $post_content['form_fields'] ) ? $post_content['form_fields'] : array();
+
+	if ( ! empty( $form_fields ) ) {
+		foreach ( $form_fields as $field ) {
+			if ( isset( $field['meta-key'] ) && $meta_key == $field['meta-key'] ) {
+				return $field['type'];
 			}
 		}
 	}
@@ -1311,6 +1375,17 @@ function evf_get_all_form_fields_by_form_id( $form_id ) {
 	}
 
 	return $data;
+}
+
+/**
+ * Check if the string JSON.
+ *
+ * @param  string $string
+ * @return bool
+ */
+function evf_isJson( $string ) {
+	json_decode( $string );
+	return ( json_last_error() == JSON_ERROR_NONE );
 }
 
 /**
@@ -1422,9 +1497,13 @@ function evf_get_license_plan() {
 		$license_data = get_transient( 'evf_pro_license_plan' );
 
 		if ( false === $license_data ) {
-			$license_data = json_decode( EVF_Updater_Key_API::check( array(
-				'license' => $license_key,
-			) ) );
+			$license_data = json_decode(
+				EVF_Updater_Key_API::check(
+					array(
+						'license' => $license_key,
+					)
+				)
+			);
 
 			if ( ! empty( $license_data->item_plan ) ) {
 				set_transient( 'evf_pro_license_plan', $license_data, WEEK_IN_SECONDS );
@@ -1445,7 +1524,7 @@ function evf_get_license_plan() {
  * @return string
  */
 function evf_decode_string( $string ) {
-	if ( ! is_string( $string) ) {
+	if ( ! is_string( $string ) ) {
 		return $string;
 	}
 
@@ -1721,10 +1800,12 @@ function evf_get_countries() {
  */
 function evf_get_fields_groups() {
 	return (array) apply_filters(
-		'everest_forms_builder_fields_groups', array(
+		'everest_forms_builder_fields_groups',
+		array(
 			'general'  => __( 'General Fields', 'everest-forms' ),
 			'advanced' => __( 'Advanced Fields', 'everest-forms' ),
 			'payment'  => __( 'Payment Fields', 'everest-forms' ),
+			'survey'   => __( 'Survey Fields', 'everest-forms' ),
 		)
 	);
 }
@@ -1747,15 +1828,15 @@ function evf_get_fields_group( $type = '' ) {
  */
 function evf_get_all_fields_settings() {
 	$settings = array(
-		'label' => array(
+		'label'         => array(
 			'id'       => 'label',
 			'title'    => __( 'Label', 'everest-forms' ),
-			'desc'     => __( 'Enter text for the form field label.', 'everest-forms' ),
+			'desc'     => __( 'Enter text for the form field label. This is recommended and can be hidden in the Advanced Settings.', 'everest-forms' ),
 			'default'  => '',
 			'type'     => 'text',
 			'desc_tip' => true,
 		),
-		'meta' => array(
+		'meta'          => array(
 			'id'       => 'meta-key',
 			'title'    => __( 'Meta Key', 'everest-forms' ),
 			'desc'     => __( 'Enter meta key to be stored in database.', 'everest-forms' ),
@@ -1763,15 +1844,15 @@ function evf_get_all_fields_settings() {
 			'type'     => 'text',
 			'desc_tip' => true,
 		),
-		'description'     => array(
-			'id'          => 'description',
-			'title'       => __( 'Description', 'everest-forms' ),
-			'type'        => 'textarea',
-			'desc' => __( 'Enter text for the form field description.', 'everest-forms' ),
-			'default'     => '',
-			'desc_tip'    => true,
+		'description'   => array(
+			'id'       => 'description',
+			'title'    => __( 'Description', 'everest-forms' ),
+			'type'     => 'textarea',
+			'desc'     => __( 'Enter text for the form field description.', 'everest-forms' ),
+			'default'  => '',
+			'desc_tip' => true,
 		),
-		'required' => array(
+		'required'      => array(
 			'id'       => 'require',
 			'title'    => __( 'Required', 'everest-forms' ),
 			'type'     => 'checkbox',
@@ -1779,7 +1860,7 @@ function evf_get_all_fields_settings() {
 			'default'  => 'no',
 			'desc_tip' => true,
 		),
-		'choices' => array(
+		'choices'       => array(
 			'id'       => 'choices',
 			'title'    => __( 'Choices', 'everest-forms' ),
 			'desc'     => __( 'Add choices for the form field.', 'everest-forms' ),
@@ -1791,7 +1872,7 @@ function evf_get_all_fields_settings() {
 				3 => __( 'Third Choice', 'everest-forms' ),
 			),
 		),
-		'placeholder' => array(
+		'placeholder'   => array(
 			'id'       => 'placeholder',
 			'title'    => __( 'Placeholder Text', 'everest-forms' ),
 			'desc'     => __( 'Enter text for the form field placeholder.', 'everest-forms' ),
@@ -1799,7 +1880,7 @@ function evf_get_all_fields_settings() {
 			'type'     => 'text',
 			'desc_tip' => true,
 		),
-		'css' => array(
+		'css'           => array(
 			'id'       => 'css',
 			'title'    => __( 'CSS Classes', 'everest-forms' ),
 			'desc'     => __( 'Enter CSS class for this field container. Class names should be separated with spaces.', 'everest-forms' ),
@@ -1807,23 +1888,76 @@ function evf_get_all_fields_settings() {
 			'type'     => 'text',
 			'desc_tip' => true,
 		),
-		'label_hide' => array(
-			'id'      => 'label_hide',
-			'title'   => __( 'Hide Label', 'everest-forms' ),
-			'type'    => 'checkbox',
-			'desc'    => __( 'Check this option to hide the form field label.', 'everest-forms' ),
-			'default' => 'no',
-			'desc_tip'    => true,
+		'label_hide'    => array(
+			'id'       => 'label_hide',
+			'title'    => __( 'Hide Label', 'everest-forms' ),
+			'type'     => 'checkbox',
+			'desc'     => __( 'Check this option to hide the form field label.', 'everest-forms' ),
+			'default'  => 'no',
+			'desc_tip' => true,
 		),
 		'sublabel_hide' => array(
-			'id'      => 'sublabel_hide',
-			'title'   => __( 'Hide Sub-Labels', 'everest-forms' ),
-			'type'    => 'checkbox',
-			'desc'    => __( 'Check this option to hide the form field sub-label.', 'everest-forms' ),
-			'default' => 'no',
-			'desc_tip'    => true,
+			'id'       => 'sublabel_hide',
+			'title'    => __( 'Hide Sub-Labels', 'everest-forms' ),
+			'type'     => 'checkbox',
+			'desc'     => __( 'Check this option to hide the form field sub-label.', 'everest-forms' ),
+			'default'  => 'no',
+			'desc_tip' => true,
 		),
 	);
 
 	return apply_filters( 'everest_form_all_fields_settings', $settings );
+}
+
+/**
+ * Helper function to display debug data.
+ *
+ * @since 1.3.2
+ *
+ * @param mixed $expression The expression to be printed.
+ * @param bool  $return     Optional. Default false. Set to true to return the human-readable string.
+ *
+ * @return string
+ */
+function evf_debug_data( $expression, $return = false ) {
+	if ( defined( 'EVF_DEBUG' ) && true === EVF_DEBUG ) {
+		$output = '<textarea style="color:#666;background:#fff;margin: 20px 0;width:100%;height:500px;font-size:12px;font-family: Consolas,Monaco,Lucida Console,monospace;direction: ltr;unicode-bidi: embed;line-height: 1.4;padding: 4px 6px 1px;" readonly>';
+
+		$output .= "==================== Everest Forms Debugging ====================\n\n";
+
+		if ( is_array( $expression ) || is_object( $expression ) ) {
+			$output .= evf_print_r( $expression, true );
+		} else {
+			$output .= $expression;
+		}
+
+		$output .= '</textarea>';
+
+		if ( $return ) {
+			return $output;
+		} else {
+			echo $output; // phpcs:ignore
+		}
+	}
+}
+
+/**
+ * String translation function.
+ *
+ * @since 1.4.9
+ *
+ * @param int    $form_id Form ID.
+ * @param string $field_id Field ID.
+ * @param mixed  $variable To be translated for WPML compatibility.
+ */
+function evf_string_translation( $form_id, $field_id, $variable ) {
+	if ( function_exists( 'icl_register_string' ) ) {
+		icl_register_string( isset( $form_id ) ? 'everest_forms_' . absint( $form_id ) : 0, isset( $field_id ) ? $field_id : '', $variable );
+	}
+
+	if ( function_exists( 'icl_t' ) ) {
+		$variable = icl_t( isset( $form_id ) ? 'everest_forms_' . absint( $form_id ) : 0, isset( $field_id ) ? $field_id : '', $variable );
+	}
+
+	return $variable;
 }

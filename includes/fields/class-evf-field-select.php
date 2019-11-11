@@ -40,7 +40,7 @@ class EVF_Field_Select extends EVF_Form_Fields {
 			),
 		);
 		$this->settings = array(
-			'basic-options' => array(
+			'basic-options'    => array(
 				'field_options' => array(
 					'label',
 					'meta',
@@ -75,27 +75,27 @@ class EVF_Field_Select extends EVF_Form_Fields {
 		$this->field_preview_option( 'label', $field );
 
 		// Field select element.
-		echo '<select class="widefat primary-input" disabled>';
+		echo '<select class="widefat" disabled>';
 
-			// Optional placeholder.
-			if ( ! empty( $placeholder ) ) {
-				printf( '<option value="" class="placeholder">%s</option>', $placeholder );
-			}
+		// Optional placeholder.
+		if ( ! empty( $placeholder ) ) {
+			printf( '<option value="" class="placeholder">%s</option>', $placeholder );
+		}
 
-			// Notify if currently empty.
-			if ( empty( $values ) ) {
-				$values = array(
-					'label' => __( '(empty)', 'everest-forms' ),
-				);
-			}
+		// Notify if currently empty.
+		if ( empty( $values ) ) {
+			$values = array(
+				'label' => __( '(empty)', 'everest-forms' ),
+			);
+		}
 
-			// Build the select options (even though user can only see 1st option).
-			foreach ( $values as $key => $value ) {
-				$default  = isset( $value['default'] ) ? $value['default'] : '';
-				$selected = ! empty( $placeholder ) ? '' : selected( '1', $default, false );
+		// Build the select options (even though user can only see 1st option).
+		foreach ( $values as $key => $value ) {
+			$default  = isset( $value['default'] ) ? $value['default'] : '';
+			$selected = ! empty( $placeholder ) ? '' : selected( '1', $default, false );
 
-				printf( '<option %s>%s</option>', $selected, $value['label'] );
-			}
+			printf( '<option %s>%s</option>', $selected, $value['label'] );
+		}
 
 		echo '</select>';
 
@@ -111,14 +111,10 @@ class EVF_Field_Select extends EVF_Form_Fields {
 	 * @param array $form_data
 	 */
 	public function field_display( $field, $field_atts, $form_data ) {
-
 		// Setup and sanitize the necessary data.
-		$conditional_rules  = isset( $field['properties']['inputs']['primary']['attr']['conditional_rules'] ) ? $field['properties']['inputs']['primary']['attr']['conditional_rules'] : '';
-		$conditional_id     = isset( $field['properties']['inputs']['primary']['attr']['conditional_id'] ) ? $field['properties']['inputs']['primary']['attr']['conditional_id'] : '';		$field             = apply_filters( 'everest_forms_select_field_display', $field, $field_atts, $form_data );
+		$primary           = $field['properties']['inputs']['primary'];
+		$field             = apply_filters( 'everest_forms_select_field_display', $field, $field_atts, $form_data );
 		$field_placeholder = ! empty( $field['placeholder'] ) ? esc_attr( $field['placeholder'] ) : '';
-		$field_required    = ! empty( $field['required'] ) ? ' required' : '';
-		$field_class       = implode( ' ', array_map( 'sanitize_html_class', $field_atts['input_class'] ) );
-		$field_id          = implode( ' ', array_map( 'sanitize_html_class', $field_atts['input_id'] ) );
 		$field_data        = '';
 		$choices           = $field['choices'];
 		$has_default       = false;
@@ -138,14 +134,10 @@ class EVF_Field_Select extends EVF_Form_Fields {
 		}
 
 		// Primary select field.
-		printf( '<select name="everest_forms[form_fields][%s]" id="%s" class="%s" %s %s conditional_rules="%s" conditional_id="%s">',
-			$field['id'],
-			$field_id,
-			$field_class,
-			$field_required,
-			$field_data,
-			$conditional_rules,
-			$conditional_id
+		printf(
+			"<select type='select' %s %s>",
+			evf_html_attributes( $primary['id'], $primary['class'], $primary['data'], $primary['attr'] ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			$primary['required'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		);
 
 		// Optional placeholder.
@@ -188,7 +180,6 @@ class EVF_Field_Select extends EVF_Form_Fields {
 		);
 
 		// Normal processing, dynamic population is off.
-
 		// If show_values is true, that means values posted are the raw values
 		// and not the labels. So we need to get the label values.
 		if ( ! empty( $field['show_values'] ) && '1' == $field['show_values'] ) {

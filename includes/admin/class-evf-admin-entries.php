@@ -18,6 +18,7 @@ class EVF_Admin_Entries {
 	 */
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'actions' ) );
+		add_filter( 'heartbeat_received', array( $this, 'check_new_entries' ), 10, 3 );
 	}
 
 	/**
@@ -33,7 +34,9 @@ class EVF_Admin_Entries {
 	 * Page output.
 	 */
 	public static function page_output() {
-		if ( isset( $_GET['view-entry'] ) ) {
+		if ( apply_filters( 'everest_forms_entries_list_actions', false ) ) {
+			do_action( 'everest_forms_entries_list_actions_execute' );
+		} elseif ( isset( $_GET['view-entry'] ) ) {
 			$form_id  = isset( $_GET['form_id'] ) ? absint( $_GET['form_id'] ) : 0; // WPCS: input var okay, CSRF ok.
 			$entry_id = isset( $_GET['view-entry'] ) ? absint( $_GET['view-entry'] ) : 0; // WPCS: input var okay, CSRF ok.
 			$entry    = evf_get_entry( $entry_id );
@@ -50,23 +53,30 @@ class EVF_Admin_Entries {
 	private static function table_list_output() {
 		global $entries_table_list;
 
-		// Get the entries count.
-		$count = count( evf_get_entries_ids( $entries_table_list->form_id ) );
+		// Get the entries IDs.
+		$entry_ids = evf_get_entries_ids( $entries_table_list->form_id );
 
 		$entries_table_list->process_bulk_action();
 		$entries_table_list->prepare_items();
 		?>
-		<div class="wrap">
+		<div id="everest-forms-entries-list" class="wrap">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Entries', 'everest-forms' ); ?></h1>
 			<hr class="wp-header-end">
 
 			<?php settings_errors(); ?>
+			<?php do_action( 'everest_forms_before_entry_list', $entries_table_list ); ?>
 
-			<?php if ( 0 < $count ) : ?>
-				<form id="entries-list" method="post">
+			<?php if ( 0 < count( $entry_ids ) ) : ?>
+				<?php $entries_table_list->views(); ?>
+				<form id="entries-list" method="get" data-form-id="<?php echo absint( $entries_table_list->form_id ); ?>" data-last-entry-id="<?php echo absint( end( $entry_ids ) ); ?>">
 					<input type="hidden" name="page" value="evf-entries" />
+					<?php if ( ! empty( $_REQUEST['form_id'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification ?>
+						<input type="hidden" name="form_id" value="<?php echo absint( $_REQUEST['form_id'] ); ?>" />
+					<?php endif; ?>
+					<?php if ( ! empty( $_REQUEST['status'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification ?>
+						<input type="hidden" name="status" value="<?php echo sanitize_text_field( wp_unslash( $_REQUEST['status'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.NoNonceVerification, WordPress.Security.EscapeOutput ?>" />
+					<?php endif; ?>
 					<?php
-						$entries_table_list->views();
 						$entries_table_list->search_box( __( 'Search Entries', 'everest-forms' ), 'everest-forms' );
 						$entries_table_list->display();
 					?>
@@ -83,10 +93,10 @@ class EVF_Admin_Entries {
 								$entries_table_list->forms_dropdown();
 								$output = ob_get_clean();
 
-								if ( ! empty( $output ) ) {
-									echo $output;
-									submit_button( __( 'Filter', 'everest-forms' ), '', '', false, array( 'id' => 'post-query-submit' ) );
-								}
+							if ( ! empty( $output ) ) {
+								echo $output; // @codingStandardsIgnoreLine
+								submit_button( __( 'Filter', 'everest-forms' ), '', '', false, array( 'id' => 'post-query-submit' ) );
+							}
 							?>
 						</form>
 					<?php else : ?>
@@ -148,7 +158,17 @@ class EVF_Admin_Entries {
 			}
 		}
 
-		wp_redirect( esc_url_raw( add_query_arg( array( 'form_id' => $form_id, 'trashed' => 1 ), admin_url( 'admin.php?page=evf-entries' ) ) ) );
+		wp_safe_redirect(
+			esc_url_raw(
+				add_query_arg(
+					array(
+						'form_id' => $form_id,
+						'trashed' => 1,
+					),
+					admin_url( 'admin.php?page=evf-entries' )
+				)
+			)
+		);
 		exit();
 	}
 
@@ -168,7 +188,17 @@ class EVF_Admin_Entries {
 			}
 		}
 
-		wp_redirect( esc_url_raw( add_query_arg( array( 'form_id' => $form_id, 'untrashed' => 1 ), admin_url( 'admin.php?page=evf-entries' ) ) ) );
+		wp_safe_redirect(
+			esc_url_raw(
+				add_query_arg(
+					array(
+						'form_id'   => $form_id,
+						'untrashed' => 1,
+					),
+					admin_url( 'admin.php?page=evf-entries' )
+				)
+			)
+		);
 		exit();
 	}
 
@@ -188,7 +218,17 @@ class EVF_Admin_Entries {
 			}
 		}
 
-		wp_redirect( esc_url_raw( add_query_arg( array( 'form_id' => $form_id, 'deleted' => 1 ), admin_url( 'admin.php?page=evf-entries' ) ) ) );
+		wp_safe_redirect(
+			esc_url_raw(
+				add_query_arg(
+					array(
+						'form_id' => $form_id,
+						'deleted' => 1,
+					),
+					admin_url( 'admin.php?page=evf-entries' )
+				)
+			)
+		);
 		exit();
 	}
 
@@ -283,6 +323,33 @@ class EVF_Admin_Entries {
 		);
 
 		return $update;
+	}
+
+	/**
+	 * Check new entries with heartbeat API.
+	 *
+	 * @since 1.5.0
+	 *
+	 * @param  array  $response  The Heartbeat response.
+	 * @param  array  $data      The $_POST data sent.
+	 * @param  string $screen_id The screen id.
+	 * @return array The Heartbeat response.
+	 */
+	public function check_new_entries( $response, $data, $screen_id ) {
+		if ( 'everest-forms_page_evf-entries' === $screen_id ) {
+			$form_id       = ! empty( $data['evf_new_entries_form_id'] ) ? absint( $data['evf_new_entries_form_id'] ) : 0;
+			$last_entry_id = ! empty( $data['evf_new_entries_last_entry_id'] ) ? absint( $data['evf_new_entries_last_entry_id'] ) : 0;
+
+			// Count new entries.
+			$entries_count = evf_get_count_entries_by_last_entry( $form_id, $last_entry_id );
+
+			if ( ! empty( $entries_count ) ) {
+				/* translators: %d - New form entries count. */
+				$response['evf_new_entries_notification'] = esc_html( sprintf( _n( '%d new entry since you last checked.', '%d new entries since you last checked.', $entries_count, 'everest-forms' ), $entries_count ) );
+			}
+		}
+
+		return $response;
 	}
 }
 

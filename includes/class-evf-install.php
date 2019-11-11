@@ -44,8 +44,24 @@ class EVF_Install {
 			'evf_update_120_db_version',
 		),
 		'1.3.0' => array(
-			'evf_update_130_change_evf_sessions_schema',
 			'evf_update_130_db_version',
+		),
+		'1.4.0' => array(
+			'evf_update_140_db_multiple_email',
+			'evf_update_140_db_version',
+		),
+		'1.4.4' => array(
+			'evf_update_144_delete_options',
+			'evf_update_144_db_version',
+		),
+		'1.4.9' => array(
+			'evf_update_149_db_rename_options',
+			'evf_update_149_no_payment_options',
+			'evf_update_149_db_version',
+		),
+		'1.5.0' => array(
+			'evf_update_150_field_datetime_type',
+			'evf_update_150_db_version',
 		),
 	);
 
@@ -96,6 +112,7 @@ class EVF_Install {
 	 */
 	public static function install_actions() {
 		if ( ! empty( $_GET['do_update_everest_forms'] ) ) {
+			check_admin_referer( 'evf_db_update', 'evf_db_update_nonce' );
 			self::update();
 			EVF_Admin_Notices::add_notice( 'update' );
 		}
@@ -134,6 +151,7 @@ class EVF_Install {
 		self::maybe_enable_setup_wizard();
 		self::update_evf_version();
 		self::maybe_update_db_version();
+		self::maybe_add_activated_date();
 
 		delete_transient( 'evf_installing' );
 
@@ -170,18 +188,20 @@ class EVF_Install {
 	 *
 	 * @return boolean
 	 */
-	private static function needs_db_update() {
+	public static function needs_db_update() {
 		$current_db_version = get_option( 'everest_forms_db_version', null );
 		$updates            = self::get_db_update_callbacks();
+		$update_versions    = array_keys( $updates );
+		usort( $update_versions, 'version_compare' );
 
-		return ! is_null( $current_db_version ) && version_compare( $current_db_version, max( array_keys( $updates ) ), '<' );
+		return ! is_null( $current_db_version ) && version_compare( $current_db_version, end( $update_versions ), '<' );
 	}
 
 	/**
 	 * See if we need the wizard or not.
 	 */
 	private static function maybe_enable_setup_wizard() {
-		if ( apply_filters( 'everest_forms_enable_setup_wizard', self::is_new_install() ) ) {
+		if ( apply_filters( 'everest_forms_enable_setup_wizard', true ) ) {
 			set_transient( '_evf_activation_redirect', 1, 30 );
 		}
 	}
@@ -199,6 +219,17 @@ class EVF_Install {
 			}
 		} else {
 			self::update_db_version();
+		}
+	}
+
+	/**
+	 * Store the initial plugin activation date during install.
+	 */
+	private static function maybe_add_activated_date() {
+		$activated_date = get_option( 'everest_forms_activated', '' );
+
+		if ( empty( $activated_date ) ) {
+			update_option( 'everest_forms_activated', current_time( 'timestamp' ) );
 		}
 	}
 
@@ -313,7 +344,21 @@ class EVF_Install {
 
 		$wpdb->hide_errors();
 
-		require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+		/**
+		 * Change wp_evf_sessions schema to use a bigint auto increment field
+		 * instead of char(32) field as the primary key. Doing this change primarily
+		 * as it should reduce the occurrence of deadlocks, but also because it is
+		 * not a good practice to use a char(32) field as the primary key of a table.
+		 */
+		if ( $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}evf_sessions'" ) ) {
+			if ( ! $wpdb->get_var( "SHOW KEYS FROM {$wpdb->prefix}evf_sessions WHERE Key_name = 'PRIMARY' AND Column_name = 'session_id'" ) ) {
+				$wpdb->query(
+					"ALTER TABLE `{$wpdb->prefix}evf_sessions` DROP PRIMARY KEY, DROP KEY `session_id`, ADD PRIMARY KEY(`session_id`), ADD UNIQUE KEY(`session_key`)"
+				);
+			}
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		dbDelta( self::get_schema() );
 	}
@@ -508,18 +553,22 @@ CREATE TABLE {$wpdb->prefix}evf_sessions (
 			include_once dirname( __FILE__ ) . '/templates/contact.php';
 
 			// Create a form.
-			$form_id = wp_insert_post( array(
-				'post_title'   => esc_html( 'Contact Form', 'everest-forms' ),
-				'post_status'  => 'publish',
-				'post_type'    => 'everest_form',
-				'post_content' => '{}',
-			) );
+			$form_id = wp_insert_post(
+				array(
+					'post_title'   => esc_html( 'Contact Form', 'everest-forms' ),
+					'post_status'  => 'publish',
+					'post_type'    => 'everest_form',
+					'post_content' => '{}',
+				)
+			);
 
 			if ( $form_id ) {
-				wp_update_post( array(
-					'ID'           => $form_id,
-					'post_content' => evf_encode( array_merge( array( 'id' => $form_id ), $form_template['contact'] ) ),
-				) );
+				wp_update_post(
+					array(
+						'ID'           => $form_id,
+						'post_content' => evf_encode( array_merge( array( 'id' => $form_id ), $form_template['contact'] ) ),
+					)
+				);
 			}
 
 			update_option( 'everest_forms_default_form_page_id', $form_id );
@@ -585,7 +634,7 @@ CREATE TABLE {$wpdb->prefix}evf_sessions (
 		if ( EVF_PLUGIN_BASENAME == $plugin_file ) {
 			$new_plugin_meta = array(
 				'docs'    => '<a href="' . esc_url( apply_filters( 'everest_forms_docs_url', 'https://docs.wpeverest.com/documentation/plugins/everest-forms/' ) ) . '" aria-label="' . esc_attr__( 'View Everest Forms documentation', 'everest-forms' ) . '">' . esc_html__( 'Docs', 'everest-forms' ) . '</a>',
-				'support' => '<a href="' . esc_url( apply_filters( 'everest_forms_support_url', 'https://wpeverest.com/support-forum/' ) ) . '" aria-label="' . esc_attr__( 'Visit free customer support', 'everest-forms' ) . '">' . esc_html__( 'Free support', 'everest-forms' ) . '</a>',
+				'support' => '<a href="' . esc_url( apply_filters( 'everest_forms_support_url', 'https://wordpress.org/support/plugin/everest-forms/' ) ) . '" aria-label="' . esc_attr__( 'Visit free customer support', 'everest-forms' ) . '">' . esc_html__( 'Free support', 'everest-forms' ) . '</a>',
 			);
 
 			return array_merge( $plugin_meta, $new_plugin_meta );

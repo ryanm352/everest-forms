@@ -16,10 +16,42 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+$classes = apply_filters(
+	'everest_forms_success_notice_class',
+	array(
+		'everest-forms-notice--success',
+	)
+);
 ?>
 
 <?php if ( $messages ) : ?>
 	<?php foreach ( $messages as $message ) : ?>
-		<div class="everest-forms-notice everest-forms-notice--success" role="alert"><?php echo wp_kses_post( $message ); ?></div>
+		<div class="everest-forms-notice <?php echo esc_attr( implode( ' ', $classes ) ); ?>" role="alert">
+		<?php
+			echo wp_kses(
+				$message,
+				array(
+					'div'   => array(
+						'class' => true,
+						'style' => true,
+					),
+					'input' => array(
+						'type'     => true,
+						'value'    => true,
+						'class'    => true,
+						'disabled' => true,
+						'checked'  => true,
+					),
+					'ul'    => array(
+						'class' => true,
+					),
+					'li'    => array(
+						'class' => true,
+					),
+				)
+			);
+		?>
+	</div>
 	<?php endforeach; ?>
 <?php endif; ?>

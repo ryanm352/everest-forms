@@ -47,10 +47,13 @@ function evf_get_entries_ids( $form_id ) {
  * @return array
  */
 function evf_get_entry_statuses() {
-	return apply_filters( 'everest_forms_entry_statuses', array(
-		'publish' => __( 'Published', 'everest-forms' ),
-		'trash'   => __( 'Trash', 'everest-forms' ),
-	) );
+	return apply_filters(
+		'everest_forms_entry_statuses',
+		array(
+			'publish' => __( 'Published', 'everest-forms' ),
+			'trash'   => __( 'Trash', 'everest-forms' ),
+		)
+	);
 }
 
 /**
@@ -62,61 +65,55 @@ function evf_get_entry_statuses() {
 function evf_search_entries( $args ) {
 	global $wpdb;
 
-	$args = wp_parse_args( $args, array(
-		'limit'   => 10,
-		'offset'  => 0,
-		'order'   => 'DESC',
-		'orderby' => 'entry_id',
-	) );
+	$args = wp_parse_args(
+		$args,
+		array(
+			'limit'   => 10,
+			'offset'  => 0,
+			'order'   => 'DESC',
+			'orderby' => 'entry_id',
+		)
+	);
+
+	$statuses     = evf_get_entry_statuses();
+	$valid_fields = array( 'date', 'form_id', 'title', 'status' );
 
 	// Check if form ID is valid for entries.
 	if ( ! array_key_exists( $args['form_id'], evf_get_all_forms() ) ) {
 		return array();
 	}
 
-	$orderby       = isset( $args['orderby'] ) ? $args['orderby'] : 'entry_id';
-	$limit         = -1 < $args['limit'] ? sprintf( 'LIMIT %d', $args['limit'] ) : '';
-	$offset        = 0 < $args['offset'] ? sprintf( 'OFFSET %d', $args['offset'] ) : '';
-	$status        = ! empty( $args['status'] ) ? "AND `status` = '" . sanitize_key( $args['status'] ) . "'" : '';
-	$search        = ! empty( $args['search'] ) ? "AND `meta_value` LIKE '%" . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . "%'" : '';
-	$include       = ! empty( $args['form_id'] ) ? "AND `form_id` = '" . absint( $args['form_id'] ) . "'" : '';
-	$exclude       = '';
-	$date_created  = '';
-	$date_modified = '';
+	$query   = array();
+	$query[] = "SELECT DISTINCT {$wpdb->prefix}evf_entries.entry_id FROM {$wpdb->prefix}evf_entries INNER JOIN {$wpdb->prefix}evf_entrymeta WHERE {$wpdb->prefix}evf_entries.entry_id = {$wpdb->prefix}evf_entrymeta.entry_id";
 
-	if ( ! empty( $args['after'] ) || ! empty( $args['before'] ) ) {
-		$args['after']  = empty( $args['after'] ) ? '0000-00-00' : $args['after'];
-		$args['before'] = empty( $args['before'] ) ? current_time( 'mysql', 1 ) : $args['before'];
-
-		$date_created = "AND `date_created_gmt` BETWEEN STR_TO_DATE('" . $args['after'] . "', '%Y-%m-%d %H:%i:%s') and STR_TO_DATE('" . $args['before'] . "', '%Y-%m-%d %H:%i:%s')";
+	if ( ! empty( $args['search'] ) ) {
+		$like    = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+		$query[] = $wpdb->prepare( 'AND meta_value LIKE %s', $like );
 	}
 
-	if ( ! empty( $args['modified_after'] ) || ! empty( $args['modified_before'] ) ) {
-		$args['modified_after']  = empty( $args['modified_after'] ) ? '0000-00-00' : $args['modified_after'];
-		$args['modified_before'] = empty( $args['modified_before'] ) ? current_time( 'mysql', 1 ) : $args['modified_before'];
-
-		$date_modified = "AND `date_modified_gmt` BETWEEN STR_TO_DATE('" . $args['modified_after'] . "', '%Y-%m-%d %H:%i:%s') and STR_TO_DATE('" . $args['modified_before'] . "', '%Y-%m-%d %H:%i:%s')";
+	if ( ! empty( $args['form_id'] ) ) {
+		$query[] = $wpdb->prepare( 'AND form_id = %d', absint( $args['form_id'] ) );
 	}
 
-	$order = "ORDER BY {$orderby} " . strtoupper( sanitize_key( $args['order'] ) );
+	if ( ! empty( $args['status'] ) ) {
+		$query[] = $wpdb->prepare( 'AND `status` = %s', isset( $statuses[ $args['status'] ] ) ? $args['status'] : 'publish' );
+	}
 
-	$query = trim( "
-		SELECT DISTINCT {$wpdb->prefix}evf_entries.entry_id
-		FROM {$wpdb->prefix}evf_entries
-		INNER JOIN {$wpdb->prefix}evf_entrymeta
-		WHERE {$wpdb->prefix}evf_entries.entry_id = {$wpdb->prefix}evf_entrymeta.entry_id
-		{$status}
-		{$search}
-		{$include}
-		{$exclude}
-		{$date_created}
-		{$date_modified}
-		{$order}
-		{$limit}
-		{$offset}
-	" );
+	$orderby     = in_array( $args['orderby'], $valid_fields, true ) ? $args['orderby'] : 'entry_id';
+	$order       = 'DESC' === strtoupper( $args['order'] ) ? 'DESC' : 'ASC';
+	$orderby_sql = sanitize_sql_orderby( "{$orderby} {$order}" );
+	$query[]     = "ORDER BY {$orderby_sql}";
 
-	$results = $wpdb->get_results( $query ); // WPCS: cache ok, DB call ok, unprepared SQL ok.
+	if ( -1 < $args['limit'] ) {
+		$query[] = $wpdb->prepare( 'LIMIT %d', absint( $args['limit'] ) );
+	}
+
+	if ( 0 < $args['offset'] ) {
+		$query[] = $wpdb->prepare( 'OFFSET %d', absint( $args['offset'] ) );
+	}
+
+	// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$results = $wpdb->get_results( implode( ' ', $query ), ARRAY_A );
 
 	$ids = wp_list_pluck( $results, 'entry_id' );
 
@@ -134,14 +131,33 @@ function evf_get_count_entries_by_status( $form_id ) {
 	$counts   = array();
 
 	foreach ( $statuses as $status ) {
-		$count = count( evf_search_entries( array(
-			'limit'   => -1,
-			'status'  => $status,
-			'form_id' => $form_id,
-		) ) );
+		$count = count(
+			evf_search_entries(
+				array(
+					'limit'   => -1,
+					'status'  => $status,
+					'form_id' => $form_id,
+				)
+			)
+		);
 
 		$counts[ $status ] = $count;
 	}
 
 	return $counts;
+}
+
+/**
+ * Get total next entries counts by last entry.
+ *
+ * @since 1.5.0
+ *
+ * @param  int $form_id    Form ID.
+ * @param  int $last_entry Last Form ID.
+ * @return int[]
+ */
+function evf_get_count_entries_by_last_entry( $form_id, $last_entry ) {
+	global $wpdb;
+
+	return $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(entry_id) FROM {$wpdb->prefix}evf_entries WHERE form_id = %d AND entry_id > %d", $form_id, $last_entry ) );
 }

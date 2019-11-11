@@ -46,7 +46,7 @@ class EVF_Admin_Menus {
 	 * @return string
 	 */
 	private function get_icon_svg( $base64 = true ) {
-		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><g><path fill="#82878c" d="M4.5 0v3H0v17h20V0H4.5zM9 19H1V4h8v15zm10 0h-9V3H5.5V1H19v18zM6.5 6h-4V5h4v1zm1 2v1h-5V8h5zm-5 3h3v1h-3v-1z"/></g></svg>';
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g><path fill="#82878c" d="M18.1 4h-3.8l1.2 2h3.9zM20.6 8h-3.9l1.2 2h3.9zM20.6 18H5.8L12 7.9l2.5 4.1H12l-1.2 2h7.3L12 4.1 2.2 20h19.6z"/></g></svg>';
 
 		if ( $base64 ) {
 			return 'data:image/svg+xml;base64,' . base64_encode( $svg );
@@ -67,10 +67,13 @@ class EVF_Admin_Menus {
 				$redirect_url = admin_url( 'admin.php?page=evf-builder&create-form=1' );
 
 				if ( isset( $_GET['tab'], $_GET['form_id'] ) ) {
-					$redirect_url = add_query_arg( array(
-						'tab'     => evf_clean( wp_unslash( $_GET['tab'] ) ),
-						'form_id' => absint( wp_unslash( $_GET['form_id'] ) ),
-					), admin_url( 'admin.php?page=evf-builder' ) );
+					$redirect_url = add_query_arg(
+						array(
+							'tab'     => evf_clean( wp_unslash( $_GET['tab'] ) ),
+							'form_id' => absint( wp_unslash( $_GET['form_id'] ) ),
+						),
+						admin_url( 'admin.php?page=evf-builder' )
+					);
 				}
 			} else {
 				$redirect_url = str_replace( $_GET['page'], 'evf-builder', wp_unslash( $_SERVER['REQUEST_URI'] ) ); // WPCS: input var okay, CSRF ok.
@@ -110,10 +113,13 @@ class EVF_Admin_Menus {
 			$forms_table_list = new EVF_Admin_Forms_Table_List();
 
 			// Add screen option.
-			add_screen_option( 'per_page', array(
-				'default' => 20,
-				'option'  => 'evf_forms_per_page',
-			) );
+			add_screen_option(
+				'per_page',
+				array(
+					'default' => 20,
+					'option'  => 'evf_forms_per_page',
+				)
+			);
 		}
 
 		do_action( 'everest_forms_builder_page_init' );
@@ -138,10 +144,13 @@ class EVF_Admin_Menus {
 			$entries_table_list = new EVF_Admin_Entries_Table_List();
 
 			// Add screen option.
-			add_screen_option( 'per_page', array(
-				'default' => 20,
-				'option'  => 'evf_entries_per_page',
-			) );
+			add_screen_option(
+				'per_page',
+				array(
+					'default' => 20,
+					'option'  => 'evf_entries_per_page',
+				)
+			);
 		}
 
 		do_action( 'everest_forms_entries_page_init' );

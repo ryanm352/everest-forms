@@ -192,3 +192,11 @@ function get_all_form_fields_by_form_id( $form_id ) {
 	evf_deprecated_function( 'get_all_form_fields_by_form_id', '1.3.0', 'evf_get_all_form_fields_by_form_id' );
 	return evf_get_all_form_fields_by_form_id( $string );
 }
+
+/**
+ * @deprecated 1.5.7
+ */
+function evf_has_date_field( $form_id ) {
+	evf_deprecated_function( 'evf_has_date_field', '1.5.7', 'evf_is_field_exists' );
+	return evf_is_field_exists( $form_id, 'date-time' );
+}
