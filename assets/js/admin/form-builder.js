@@ -20,6 +20,23 @@
 		 	});
 
 		 	$( document ).ready( function( $ ) {
+				if ( '1' === $( '.everest-forms-min-max-date-format input' ).val() ) {
+					$( '.everest-forms-min-max-date-option' ).find( 'input' ).datepicker({
+						defaultDate:     '',
+						dateFormat:      'yy-mm-dd',
+						numberOfMonths:  1,
+						showButtonPanel: true,
+						onSelect:        function() {
+							var option = $( this ).is( '.everest-forms-min-date' ) ? 'minDate' : 'maxDate',
+								dates  = $( this ).closest( '.everest-forms-min-max-date-option' ).find( 'input' ),
+								date   = $( this ).datepicker( 'getDate' );
+
+							dates.not( this ).datepicker( 'option', option, date );
+							$( this ).change();
+						}
+					} );
+				}
+
 		 		if ( ! $( 'evf-panel-payments-button a' ).hasClass( 'active' ) ) {
 		 			$( '#everest-forms-panel-payments' ).find( '.everest-forms-panel-sidebar a' ).first().addClass( 'active' );
 					$( '.everest-forms-panel-content' ).find( '.evf-payment-setting-content' ).first().addClass( 'active' );
@@ -143,8 +160,29 @@
 				}
 			}
 
+			// Enable Limit length.
+			$builder.on( 'change', '.everest-forms-field-option-row-limit_enabled input', function( event ) {
+				EVFPanelBuilder.updateTextFieldsLimitControls( $( event.target ).parents( '.everest-forms-field-option-row-limit_enabled' ).data().fieldId, event.target.checked );
+			} );
+
 			// Action available for each binding.
 			$( document ).trigger( 'everest_forms_ready' );
+		},
+
+		/**
+		 * Update text fields limit controls.
+		 *
+		 * @since 1.5.10
+		 *
+		 * @param {number} fieldId Field ID.
+		 * @param {bool} checked Whether an option is checked or not.
+		 */
+		updateTextFieldsLimitControls: function( fieldId, checked ) {
+			if ( ! checked ) {
+				$( '#everest-forms-field-option-row-' + fieldId + '-limit_controls' ).addClass( 'everest-forms-hidden' );
+			} else {
+				$( '#everest-forms-field-option-row-' + fieldId + '-limit_controls' ).removeClass( 'everest-forms-hidden' );
+			}
 		},
 
 		/**
@@ -752,6 +790,28 @@
 						opacity: 0.6
 					}
 				});
+
+				/* DB unwanted data erase start */
+				var rfields_ids = [];
+				$( '.everest-forms-field[data-field-id]' ).each( function() {
+					rfields_ids.push( $( this ).attr( 'data-field-id' ) );
+				});
+
+				var form_data_length = form_data.length;
+				while ( form_data_length-- ) {
+					if ( form_data[ form_data_length ].name.startsWith( 'form_fields' ) ) {
+						var idflag = false;
+						rfields_ids.forEach( function( element ) {
+							if ( form_data[ form_data_length ].name.startsWith( 'form_fields[' + element + ']' ) ) {
+								idflag = true;
+							}
+						});
+						if ( form_data_length > -1 && idflag === false )  {
+							form_data.splice( form_data_length, 1 );
+						}
+					}
+				}
+				/* DB fix end */
 
 				var new_form_data = form_data.concat( structure );
 				var data = {
@@ -1450,6 +1510,14 @@ jQuery( function ( $ ) {
 			$( this ).closest( '#everest-forms-panel-settings' ).find( '.everest-forms-active-email' ).removeClass( 'everest-forms-hidden' );
 			$this.closest( '.evf-content-section-title' ).siblings( '.evf-content-email-settings-inner' ).removeClass( 'everest-forms-hidden' );
 			$this.closest( '.evf-content-email-settings' ).find( '.email-disable-message' ).remove();
+		}
+	});
+
+	$( document ).on( 'click', '.everest-forms-min-max-date-format input', function() {
+		if ( $( this ).is( ':checked' ) ) {
+			$( '.everest-forms-min-max-date-option' ).removeClass( 'everest-forms-hidden' );
+		} else {
+			$( '.everest-forms-min-max-date-option' ).addClass( 'everest-forms-hidden' );
 		}
 	});
 

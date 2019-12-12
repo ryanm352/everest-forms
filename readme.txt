@@ -1,10 +1,10 @@
 === Contact Form, Drag and Drop Form Builder for WordPress - Everest Forms ===
 Contributors: WPEverest
 Tags: contact form, form, form builder, contact, custom form
-Requires at least: 4.0
-Tested up to: 5.2
+Requires at least: 4.9
+Tested up to: 5.3
 Requires PHP: 5.4
-Stable tag: 1.5.7
+Stable tag: 1.5.10
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -134,10 +134,24 @@ Yes you can! Join in on our [GitHub repository](https://github.com/wpeverest/eve
 
 == Changelog ==
 
-= 1.5.8 - xx-xx-2019 =
-* Tweak - Smart phone field enhancement.
+= 1.5.10 - 25-11-2019 =
+* Fix - Google reCAPTCHA v2 invisible settings bug.
+* Fix - DB unwanted data erase for fields data save.
+* Fix - Multi-part submit button hidden due to theme style conflict.
 
-= 1.5.7 - 20-11-2019 =
+= 1.5.9 - 19-11-2019 =
+* Fix - Fatal error: Called to undefined function.
+
+= 1.5.8 - 18-11-2019 =
+* Feature - Email field mailcheck feature to offer additional controls.
+* Feature - Date field localization, multiple date selections with min/max date.
+* Feature - Default value for "Paragraph text" field.
+* Fix - WordPress 5.3 compatibility.
+* Fix - Selection of radio and checkbox on label click.
+* Tweak - Smart phone field design enhancement.
+* Tweak - Seperate site and secret key for recaptcha v2 invisible.
+
+= 1.5.7 - 07-11-2019 =
 * Tweak - Design for smart phone field.
 * Tweak - CSS styling for label and radio/checkbox field.
 * Tweak - Introduced entry ID params in filter hook for email attachment.
