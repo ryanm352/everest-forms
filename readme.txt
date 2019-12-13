@@ -4,7 +4,7 @@ Tags: contact form, form, form builder, contact, custom form
 Requires at least: 4.9
 Tested up to: 5.3
 Requires PHP: 5.4
-Stable tag: 1.5.10
+Stable tag: 1.5.11
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -133,6 +133,13 @@ Bugs can be reported either in our support forum or preferably on the [Everest F
 Yes you can! Join in on our [GitHub repository](https://github.com/wpeverest/everest-forms/) :)
 
 == Changelog ==
+
+= 1.5.11 - xx-12-2019 =
+* Fix - Error handling in AJAX handler for endpoint.
+* Fix - Checks if only string is provided for JSON content.
+* Fix - Select2 style and admin screen button alignments in WP 5.3+.
+* Fix - Use brackets instead of braces to avoid deprecation notices in PHP 5.6.
+* Tweak - Store entry ID in property of task handler.
 
 = 1.5.10 - 25-11-2019 =
 * Fix - Google reCAPTCHA v2 invisible settings bug.
