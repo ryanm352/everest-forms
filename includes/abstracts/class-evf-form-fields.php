@@ -890,7 +890,7 @@ abstract class EVF_Form_Fields {
 			case 'choices':
 				$total          = 0;
 				$values         = ! empty( $field['choices'] ) ? $field['choices'] : $this->defaults;
-				$choices_fields = array( 'checkbox', 'payment-checkbox', 'select', 'radio', 'payment-radio' );
+				$choices_fields = array( 'checkbox', 'payment-checkbox', 'select', 'radio', 'payment-radio', 'decision' );
 
 				// Notify if choices source is currently empty.
 				if ( empty( $values ) ) {
@@ -905,6 +905,7 @@ abstract class EVF_Form_Fields {
 				}
 
 				switch ( $field['type'] ) {
+					case 'decision':
 					case 'checkbox':
 					case 'payment-checkbox':
 						$type = 'checkbox';
