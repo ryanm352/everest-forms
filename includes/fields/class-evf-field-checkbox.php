@@ -45,12 +45,14 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 					'label',
 					'meta',
 					'choices',
+					'choices_images',
 					'description',
 					'required',
 				),
 			),
 			'advanced-options' => array(
 				'field_options' => array(
+					'randomize',
 					'show_values',
 					'input_columns',
 					'label_hide',
@@ -66,7 +68,52 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	 * Hook in tabs.
 	 */
 	public function init_hooks() {
+		add_filter( 'everest_forms_html_field_value', array( $this, 'field_html_value' ), 10, 4 );
 		add_filter( 'everest_forms_field_properties_' . $this->type, array( $this, 'field_properties' ), 5, 3 );
+	}
+
+	/**
+	 * Return images, if any, for HTML supported values.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param string $value     Field value.
+	 * @param array  $field     Field settings.
+	 * @param array  $form_data Form data and settings.
+	 * @param string $context   Value display context.
+	 *
+	 * @return string
+	 */
+	public function field_html_value( $value, $field, $form_data = array(), $context = '' ) {
+		// Only use HTML formatting for checkbox fields, with image choices
+		// enabled, and exclude the entry table display. Lastly, provides a
+		// filter to disable fancy display.
+		if (
+			! empty( $field['value'] ) &&
+			$this->type === $field['type'] &&
+			! empty( $field['images'] ) &&
+			'entry-table' !== $context &&
+			apply_filters( 'everest_forms_checkbox_field_html_value_images', true, $context )
+		) {
+			$items  = array();
+			$values = explode( "\n", $field['value'] );
+
+			foreach ( $values as $key => $val ) {
+				if ( ! empty( $field['images'][ $key ] ) ) {
+					$items[] = sprintf(
+						'<span style="max-width:200px;display:block;margin:0 0 5px 0;"><img src="%s" style="max-width:100%%;display:block;margin:0;"></span>%s',
+						esc_url( $field['images'][ $key ] ),
+						$val
+					);
+				} else {
+					$items[] = $val;
+				}
+			}
+
+			return implode( '<br><br>', $items );
+		}
+
+		return $value;
 	}
 
 	/**
@@ -86,9 +133,33 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	}
 
 	/**
+	 * Randomize order of choices.
+	 *
+	 * @since 1.6.0
+	 * @param array $field Field Data.
+	 */
+	public function randomize( $field ) {
+		$args = array(
+			'slug'    => 'random',
+			'content' => $this->field_element(
+				'checkbox',
+				$field,
+				array(
+					'slug'    => 'random',
+					'value'   => isset( $field['random'] ) ? '1' : '0',
+					'desc'    => esc_html__( 'Randomize Choices', 'everest-forms' ),
+					'tooltip' => esc_html__( 'Check this option to randomize the order of the choices.', 'everest-forms' ),
+				),
+				false
+			),
+		);
+		$this->field_element( 'row', $field, $args );
+	}
+
+	/**
 	 * Show values field option.
 	 *
-	 * @param array $field
+	 * @param array $field Field Data.
 	 */
 	public function show_values( $field ) {
 		// Show Values toggle option. This option will only show if already used or if manually enabled by a filter.
@@ -118,19 +189,18 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	/**
 	 * Field preview inside the builder.
 	 *
-	 * @since      1.0.0
+	 * @since 1.0.0
 	 *
-	 * @param array $field
+	 * @param array $field Field settings.
 	 */
 	public function field_preview( $field ) {
-
-		// Label
+		// Label.
 		$this->field_preview_option( 'label', $field );
 
 		// Choices.
 		$this->field_preview_option( 'choices', $field );
 
-		// Description
+		// Description.
 		$this->field_preview_option( 'description', $field );
 	}
 
@@ -211,8 +281,7 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 		);
 
 		if ( 'post_type' === $dynamic && ! empty( $field['dynamic_post_type'] ) ) {
-
-			// Dynamic population is enabled using post type
+			// Dynamic population is enabled using post type.
 			$value_raw                 = implode( ',', array_map( 'absint', $field_submit ) );
 			$data['value_raw']         = $value_raw;
 			$data['dynamic']           = 'post_type';
