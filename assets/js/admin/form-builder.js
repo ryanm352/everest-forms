@@ -228,6 +228,79 @@
 		 * @since 1.2.0
 		 */
 		bindUIActionsFields: function() {
+			// Field choices image toggle.
+			$builder.on( 'change', '.everest-forms-field-option-row-choices_images input', function() {
+				var $this         = $( this ),
+					fieldID       = $this.parent().data( 'field-id' ),
+					$fieldOptions = $( '#everest-forms-field-option-' + fieldID );
+
+
+				$this.parent().find( '.notice' ).toggleClass( 'hidden' );
+				$fieldOptions.find( '.everest-forms-field-option-row-choices ul' ).toggleClass( 'show-images' );
+			} );
+
+			// Upload or add an image.
+			$builder.on( 'click', '.everest-forms-attachment-media-view .upload-button', function( event ) {
+				var $el = $( this ), $wrapper, file_frame;
+
+				event.preventDefault();
+
+				// If the media frame already exists, reopen it.
+				if ( file_frame ) {
+					file_frame.open();
+					return;
+				}
+
+				// Create the media frame.
+				file_frame = wp.media.frames.everestforms_media_frame = wp.media({
+					title:      evf_data.i18n_upload_image_title,
+					className: 'media-frame everest-forms-media-frame',
+					frame:     'select',
+					multiple:   false,
+					library: {
+						type: 'image'
+					},
+					button: {
+						text: evf_data.i18n_upload_image_button
+					}
+				});
+
+				// When an image is selected, run a callback.
+				file_frame.on( 'select', function() {
+					var attachment = file_frame.state().get( 'selection' ).first().toJSON();
+
+					if ( $el.hasClass( 'button-add-media' ) ) {
+						$el.hide();
+						$wrapper = $el.parent();
+					} else {
+						$wrapper = $el.parent().parent().parent();
+					}
+
+					$wrapper.find( '.source' ).val( attachment.url );
+					$wrapper.find( '.attachment-thumb' ).remove();
+					$wrapper.find( '.thumbnail-image'  ).prepend( '<img class="attachment-thumb" src="' + attachment.url + '">' );
+					$wrapper.find( '.actions' ).show();
+
+					$builder.trigger( 'everestFormsImageUploadAdd', [ $el, $wrapper ] );
+				});
+
+				// Finally, open the modal.
+				file_frame.open();
+			} );
+
+			// Remove and uploaded image.
+			$builder.on( 'click', '.everest-forms-attachment-media-view .remove-button', function( event ) {
+				event.preventDefault();
+
+				var $container = $( this ).parent().parent();
+
+				$container.find( '.attachment-thumb' ).remove();
+				$container.parent().find( '.source' ).val( '' );
+				$container.parent().find( '.button-add-media' ).show();
+
+				$builder.trigger( 'everestFormsImageUploadRemove', [ $( this ), $container ] );
+			});
+
 			// Field sidebar tab toggle.
 			$builder.on( 'click', '.everest-forms-fields-tab a', function(e) {
 				e.preventDefault();
@@ -341,9 +414,8 @@
 			$( 'ul.evf-choices-list' ).sortable({
 				items: 'li',
 				axis: 'y',
-				cursor: 'move',
+				handle: '.sort',
 				scrollSensitivity: 40,
-				helper: 'clone',
 				out: function ( event ) {
 					var field_id = $( event.target ).attr( 'data-field-id' );
 					EVFPanelBuilder.choiceChange( field_id );
@@ -388,12 +460,15 @@
 				var field_id = ul.attr('data-field-id');
 				var next_id = ul.attr('data-next-id');
 
-				clone.find('input[type="checkbox"],input[type="radio"]').prop('checked', false);
-				clone.attr('data-key', next_id);
-				clone.find('.default').attr('name', 'form_fields[' + field_id + '][choices][' + next_id + '][default]');
-				clone.find('.label').attr('name', 'form_fields[' + field_id + '][choices][' + next_id + '][label]');
-				clone.find('.value').attr('name', 'form_fields[' + field_id + '][choices][' + next_id + '][value]');
-				$(this).closest('li').after(clone);
+				clone.find( 'input[type="checkbox"],input[type="radio"]' ).prop( 'checked', false);
+				clone.attr( 'data-key', next_id );
+				clone.find( '.default' ).attr( 'name', 'form_fields[' + field_id + '][choices][' + next_id + '][default]' );
+				clone.find( '.label' ).val( '' ).attr( 'name', 'form_fields[' + field_id + '][choices][' + next_id + '][label]' );
+				clone.find( '.value' ).val( '' ).attr( 'name', 'form_fields[' + field_id + '][choices][' + next_id + '][value]' );
+				clone.find( '.source' ).val( '' ).attr( 'name', 'form_fields[' + field_id + '][choices][' + next_id + '][image]' );
+				clone.find( '.attachment-thumb' ).remove();
+				clone.find( '.button-add-media' ).show();
+				$(this).closest( 'li' ).after( clone );
 				next_id++;
 				$( this ).closest('.evf-choices-list').attr('data-next-id',next_id);
 				EVFPanelBuilder.choiceChange(field_id);

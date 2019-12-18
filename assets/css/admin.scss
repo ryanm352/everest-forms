@@ -1169,43 +1169,14 @@ body.everest-forms-builder-setup,
 		.removePayment {
 			color: $color_gray-normal;
 			background: $color-white;
-			border: 1px solid $color_gray-lighten;
 			height: 30px;
 			width: 30px;
 			display: flex;
 			align-items: center;
 			justify-content: center;
 
-			.dashicons {
-				width: 16px;
-				height: 16px;
-				font-size: 16px;
-				line-height: 1.1;
-			}
-
 			&:hover {
 				color: $color-white;
-			}
-		}
-
-		.add,
-		.addPayment {
-			border-radius: 4px 0 0 4px;
-
-			&:hover {
-				background: $blue;
-				border: 1px solid $blue;
-			}
-		}
-
-		.remove,
-		.removePayment {
-			border-left: none;
-			border-radius: 0 4px 4px 0;
-
-			&:hover {
-				background: $red;
-				border: 1px solid $red;
 			}
 		}
 
@@ -1362,7 +1333,7 @@ body.everest-forms-builder-setup,
 					vertical-align: middle;
 
 					&:hover {
-						background: transparentize($color-white, 0.1)
+						background: transparentize($color-white, 0.1);
 					}
 				}
 			}
@@ -2623,15 +2594,154 @@ body.everest-forms-builder-setup,
 			}
 
 			.evf-choices-list {
+				background: $color_gray-more-lighten;
+				border-radius: 4px;
+				padding: 1px 8px;
+
+				.sort {
+					cursor: grab;
+					display: flex;
+					margin-top: 6px;
+					padding-right: 6px;
+					color: $color_gray-light;
+
+					svg {
+						fill: currentColor;
+						transform: rotate(90deg);
+					}
+
+					&:active {
+						cursor: grabbing;
+					}
+				}
+
 				li {
+					background: $color-white;
+					border: 1px solid $color_gray-lighten;
+					display: flex;
+					flex-wrap: wrap;
+					padding: 8px;
+					margin: 8px 0;
+					z-index: 99999 !important;
+
+					.evf-choice-list-input {
+						flex: 1;
+						margin-right: 6px;
+					}
+
 					input {
-						&.value {
-							display: none;
+						&[type='text'] {
+							width: 100%;
 						}
 
-						&[type='text'] {
-							width: calc(100% - 89px);
+						&[type='radio'],
+						&[type='checkbox'] {
+							margin: 7px 6px 0 0;
 						}
+
+						&.value {
+							display: none;
+							margin-top: 8px;
+						}
+					}
+
+					.everest-forms-attachment-media-view {
+						flex: 100%;
+						display: none;
+						margin-top: 8px;
+
+						.button-add-media {
+							width: 100%;
+							padding: 8px;
+    						outline: none;
+							cursor: pointer;
+							border-radius: 3px;
+							color: $color_gray-base;
+							border: 1px dashed $color-gray-lighten;
+						}
+
+						.thumbnail-image {
+							display: block;
+							max-height: 200px;
+							margin-bottom: 3px;
+							position: relative;
+							overflow: hidden;
+
+							img {
+								display: block;
+								max-width: 100%;
+								user-select: none;
+								border-radius: 4px;
+							}
+
+							.actions {
+								position: absolute;
+								right: 8px;
+								bottom: 8px;
+
+								.remove-button {
+									margin-right: 8px;
+								}
+							}
+						}
+					}
+
+					&.ui-sortable-placeholder {
+						visibility: visible !important; // Overwrite CSS over JS.
+						background: $color_gray-more-lighten;
+						border: 1px dashed $color_gray-lighten;
+					}
+
+					&.ui-sortable-helper {
+						z-index: 99999 !important; // Overwrite CSS over JS.
+					}
+				}
+
+				.add,
+				.remove {
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					width: 20px;
+					height: 20px;
+					margin-top: 5px;
+					border-radius: 10px;
+
+					.dashicons {
+						width: 16px;
+						height: 16px;
+						font-size: 16px;
+					}
+				}
+
+				.add {
+					&:hover {
+						color: $blue;
+					}
+				}
+
+				.remove {
+					&:hover {
+						color: $red;
+					}
+				}
+
+				&.show-images {
+					li {
+						.everest-forms-attachment-media-view {
+							display: block;
+						}
+					}
+				}
+			}
+
+			.everest-forms-field-option-row-choices_images {
+				.notice {
+					display: inline-block;
+					margin: 0 0 15px 0 !important;
+
+					&.hidden {
+						display: none;
 					}
 				}
 			}
@@ -2641,71 +2751,9 @@ body.everest-forms-builder-setup,
 				ul {
 					li {
 						clear: both;
-						margin-bottom: 2px;
 						padding: 5px 10px;
 						border-radius: 4px;
 						border: 1px solid transparent;
-
-						&.ui-sortable-handle {
-							&.ui-sortable-placeholder {
-								height: 40px !important; // Overwrite CSS over JS.
-								visibility: visible !important; // Overwrite CSS over JS.
-								background: $color_gray-more-lighten;
-								border: 1px dashed $color_gray-lighten;
-							}
-
-							&.ui-sortable-helper {
-								z-index: 99999 !important; // Overwrite CSS over JS.
-							}
-						}
-
-						&:hover,
-						&.ui-sortable-helper {
-							background: $color-white;
-							border: 1px solid $color_gray-lighten;
-							z-index: 99999 !important;
-						}
-
-						input[type='text'] {
-							margin-right: 8px;
-							vertical-align: middle;
-						}
-
-						a {
-							background: $color-white;
-							color: $color_gray-base;
-							display: inline-block;
-							vertical-align: middle;
-
-							&.add,
-							&.remove,
-							&.addPayment,
-							&.removePayment {
-								height: 30px;
-								width: 30px;
-								display: inline-flex;
-								align-items: center;
-								justify-content: center;
-							}
-
-							&:last-child {
-								margin-right: 0;
-							}
-
-							&:hover {
-								background: $blue;
-								color: $color-white;
-								border: 1px solid $blue;
-							}
-
-							&.remove,
-							&.removePayment {
-								&:hover {
-									background: $red;
-									border: 1px solid $red;
-								}
-							}
-						}
 					}
 				}
 
@@ -2720,21 +2768,11 @@ body.everest-forms-builder-setup,
 							width: calc(100% - 39px);
 						}
 
-						.add,
-						.remove {
-							border-radius: 4px;
-							border: 1px solid $color_gray-lighten;
-						}
-
 						.answer-wrap {
 							margin-top: 6px;
 						}
 					}
 				}
-			}
-
-			.everest-forms-field-option-row-choices {
-				cursor: all-scroll;
 			}
 
 			.everest-forms-field-option-payment-multiple,
@@ -4172,7 +4210,7 @@ img.ui-datepicker-trigger {
 		right: 0;
 		height: 1px;
 		background: #fff;
-		content: "";
+		content: '';
 	}
 }
 
@@ -4243,7 +4281,7 @@ img.ui-datepicker-trigger {
 			right: 1px;
 			height: 28px;
 			width: 28px;
-			background: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%23555%22%2F%3E%3C%2Fsvg%3E") no-repeat right 5px top 55%;
+			background: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%206l5%205%205-5%202%201-7%207-7-7%202-1z%22%20fill%3D%22%23555%22%2F%3E%3C%2Fsvg%3E') no-repeat right 5px top 55%;
 			background-size: 16px 16px;
 
 			@media only screen and (max-width: 782px) {

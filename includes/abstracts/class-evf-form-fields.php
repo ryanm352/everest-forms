@@ -521,48 +521,78 @@ abstract class EVF_Form_Fields {
 			 * Choices.
 			 */
 			case 'choices':
-				$tooltip = __( 'Add choices for the form field.', 'everest-forms' );
-				$toggle  = '';
-				$dynamic = ! empty( $field['dynamic_choices'] ) ? esc_html( $field['dynamic_choices'] ) : '';
-				$values  = ! empty( $field['choices'] ) ? $field['choices'] : $this->defaults;
-				$class   = ! empty( $field['show_values'] ) && $field['show_values'] == '1' ? 'show-values' : '';
-				$class  .= ! empty( $dynamic ) ? ' hidden' : '';
+				$class  = array();
+				$label  = ! empty( $args['label'] ) ? esc_html( $args['label'] ) : esc_html__( 'Choices', 'everest-forms' );
+				$values = ! empty( $field['choices'] ) ? $field['choices'] : $this->defaults;
 
-				// Field option label and type.
-				$option_label = $this->field_element(
+				if ( ! empty( $field['show_values'] ) ) {
+					$class[] = 'show-values';
+				}
+				if ( ! empty( $field['choices_images'] ) ) {
+					$class[] = 'show-images';
+				}
+
+				// Field label.
+				$field_label = $this->field_element(
 					'label',
 					$field,
 					array(
 						'slug'          => 'choices',
-						'value'         => __( 'Choices', 'everest-forms' ),
-						'tooltip'       => $tooltip,
-						'after_tooltip' => $toggle,
-					),
-					false
+						'value'         => $label,
+						'tooltip'       => esc_html__( 'Add choices for the form field.', 'everest-forms' ),
+						'after_tooltip' => '', // @todo Bulk import and export for choices.
+					)
 				);
-				$option_type  = 'checkbox' === $this->type ? 'checkbox' : 'radio';
 
-				// Field option choices inputs.
-				$option_choices = sprintf( '<ul data-next-id="%s" class="evf-choices-list %s" data-field-id="%s" data-field-type="%s">', max( array_keys( $values ) ) + 1, $class, $field['id'], $this->type );
+				// Field contents.
+				$field_type    = 'checkbox' === $this->type ? 'checkbox' : 'radio';
+				$field_content = sprintf(
+					'<ul data-next-id="%s" class="evf-choices-list %s" data-field-id="%s" data-field-type="%s">',
+					max( array_keys( $values ) ) + 1,
+					evf_sanitize_classes( $class, true ),
+					$field['id'],
+					$this->type
+				);
 				foreach ( $values as $key => $value ) {
-					$default         = ! empty( $value['default'] ) ? $value['default'] : '';
-					$option_choices .= sprintf( '<li data-key="%d">', $key );
-					$option_choices .= sprintf( '<input type="%s" name="form_fields[%s][choices][%s][default]" class="default" value="1" %s>', $option_type, $field['id'], $key, checked( '1', $default, false ) );
-					$option_choices .= sprintf( '<input type="text" name="form_fields[%s][choices][%s][label]" value="%s" class="label">', $field['id'], $key, esc_attr( $value['label'] ) );
-					$option_choices .= sprintf( '<input type="text" name="form_fields[%s][choices][%s][value]" value="%s" class="value">', $field['id'], $key, esc_attr( $value['value'] ) );
-					$option_choices .= '<a class="add" href="#"><i class="dashicons dashicons-plus"></i></a>';
-					$option_choices .= '<a class="remove" href="#"><i class="dashicons dashicons-minus"></i></a>';
-					$option_choices .= '</li>';
+					$default = ! empty( $value['default'] ) ? $value['default'] : '';
+					$name    = sprintf( 'form_fields[%s][choices][%s]', $field['id'], $key );
+					$image   = ! empty( $value['image'] ) ? $value['image'] : '';
+
+					$field_content .= sprintf( '<li data-key="%1$d">', absint( $key ) );
+					$field_content .= '<span class="sort"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" role="img" aria-hidden="true" focusable="false"><path d="M13,8c0.6,0,1-0.4,1-1s-0.4-1-1-1s-1,0.4-1,1S12.4,8,13,8z M5,6C4.4,6,4,6.4,4,7s0.4,1,1,1s1-0.4,1-1S5.6,6,5,6z M5,10 c-0.6,0-1,0.4-1,1s0.4,1,1,1s1-0.4,1-1S5.6,10,5,10z M13,10c-0.6,0-1,0.4-1,1s0.4,1,1,1s1-0.4,1-1S13.6,10,13,10z M9,6 C8.4,6,8,6.4,8,7s0.4,1,1,1s1-0.4,1-1S9.6,6,9,6z M9,10c-0.6,0-1,0.4-1,1s0.4,1,1,1s1-0.4,1-1S9.6,10,9,10z"></path></svg></span>';
+					$field_content .= sprintf( '<input type="%1$s" name="%2$s[default]" class="default" value="1" %3$s>', $field_type, $name, checked( '1', $default, false ) );
+					$field_content .= '<div class="evf-choice-list-input">';
+					$field_content .= sprintf( '<input type="text" name="%1$s[label]" value="%2$s" class="label">', $name, esc_attr( $value['label'] ) );
+					$field_content .= sprintf( '<input type="text" name="%1$s[value]" value="%2$s" class="value">', $name, esc_attr( $value['value'] ) );
+					$field_content .= '</div>';
+					$field_content .= '<a class="add" href="#"><i class="dashicons dashicons-plus-alt"></i></a>';
+					$field_content .= '<a class="remove" href="#"><i class="dashicons dashicons-dismiss"></i></a>';
+					$field_content .= '<div class="everest-forms-attachment-media-view">';
+					$field_content .= sprintf( '<input type="hidden" class="source" name="%s[image]" value="%s">', $name, esc_url_raw( $image ) );
+					$field_content .= sprintf( '<button type="button" class="upload-button button-add-media"%s>%s</button>', ! empty( $image ) ? ' style="display:none;"' : '', esc_html__( 'Upload Image', 'everest-forms' ) );
+					$field_content .= '<div class="thumbnail thumbnail-image">';
+					if ( ! empty( $image ) ) {
+						$field_content .= sprintf( '<img class="attachment-thumb" src="%1$s">', esc_url_raw( $image ) );
+					}
+					$field_content .= sprintf( '<div class="actions"%s>', empty( $image ) ? ' style="display:none;"' : '' );
+					$field_content .= sprintf( '<button type="button" class="button remove-button">%1$s</button>', esc_html__( 'Remove', 'everest-forms' ) );
+					$field_content .= sprintf( '<button type="button" class="button upload-button">%1$s</button>', esc_html__( 'Change image', 'everest-forms' ) );
+					$field_content .= '</div>';
+					$field_content .= '</div>';
+					$field_content .= '</div>';
+					$field_content .= '</li>';
 				}
-				$option_choices .= '</ul>';
-				// Field option row (markup) including label and input.
+				$field_content .= '</ul>';
+
+				// Final field output.
 				$output = $this->field_element(
 					'row',
 					$field,
 					array(
 						'slug'    => 'choices',
-						'content' => $option_label . $option_choices,
-					)
+						'content' => $field_label . $field_content,
+					),
+					false
 				);
 				break;
 
@@ -570,6 +600,34 @@ abstract class EVF_Form_Fields {
 			 * Choices Images.
 			 */
 			case 'choices_images':
+				$field_content = sprintf(
+					'<div class="notice notice-warning%s"><p>%s</p></div>',
+					empty( $field['choices_images'] ) ? ' hidden' : '',
+					esc_html__( 'For best results, images should be square and at least 256 × 256 pixels or smaller.', 'everest-forms' )
+				);
+
+				$field_content .= $this->field_element(
+					'checkbox',
+					$field,
+					array(
+						'slug'    => 'choices_images',
+						'value'   => isset( $field['choices_images'] ) ? '1' : '0',
+						'desc'    => esc_html__( 'Use image choices', 'wpforms-lite' ),
+						'tooltip' => esc_html__( 'Check this option to enable using images with the choices.', 'wpforms-lite' ),
+					),
+					false
+				);
+
+				// Final field output.
+				$output = $this->field_element(
+					'row',
+					$field,
+					array(
+						'slug'    => 'choices_images',
+						'content' => $field_content,
+					),
+					false
+				);
 				break;
 
 			/**
@@ -925,7 +983,6 @@ abstract class EVF_Form_Fields {
 
 				if ( $choices_images ) {
 					$list_class[] = 'everest-forms-image-choices';
-					$list_class[] = 'everest-forms-image-choices-' . sanitize_html_class( $field['choices_images_style'] );
 				}
 
 				if ( 'select' === $type ) {
