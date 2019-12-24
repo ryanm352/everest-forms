@@ -87,12 +87,13 @@ class EVF_Field_Radio extends EVF_Form_Fields {
 	public function html_field_value( $value, $field, $form_data = array(), $context = '' ) {
 		if ( is_serialized( $field ) ) {
 			$field_value = maybe_unserialize( $field );
+			$type = isset( $field_value['type'] ) ? $field_value['type'] : 'radio';
 
 			if (
 				'entry-table' !== $context
 				&& ! empty( $field_value['label'] )
 				&& ! empty( $field_value['image'] )
-				&& $this->type === $field_value['type']
+				&& $this->type === $type
 				&& apply_filters( 'everest_forms_radio_field_html_value_images', true, $context )
 			) {
 				return sprintf(
@@ -101,8 +102,10 @@ class EVF_Field_Radio extends EVF_Form_Fields {
 					esc_html( $field_value['label'] )
 				);
 			}
+			if ( $this->type === $type ) {
+				return ! empty( $field_value['label'] ) ? esc_html( $field_value['label'] ) : $field_value[0];
+			}
 
-			return ! empty( $field_value['label'] ) ? esc_html( $field_value['label'] ) : $field_value[0];
 		}
 
 		return $value;

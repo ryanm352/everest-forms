@@ -86,6 +86,7 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 	 * @return string
 	 */
 	public function html_field_value( $value, $field, $form_data = array(), $context = '' ) {
+		$items = array();
 		if ( is_serialized( $field ) ) {
 			$field_value = maybe_unserialize( $field );
 
@@ -96,8 +97,6 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 				&& $this->type === $field_value['type']
 				&& apply_filters( 'everest_forms_checkbox_field_html_value_images', true, $context )
 			) {
-				$items = array();
-
 				if ( ! empty( $field_value['label'] ) ) {
 					foreach ( $field_value['label'] as $key => $value ) {
 						if ( ! empty( $field_value['images'][ $key ] ) ) {
@@ -111,8 +110,14 @@ class EVF_Field_Checkbox extends EVF_Form_Fields {
 						}
 					}
 				}
-
 				return implode( '<br><br>', $items );
+			} else {
+				if ( ! empty( $field_value['label'] ) && is_array( $field_value['label'] ) ) {
+					foreach ( $field_value['label'] as $key => $value) {
+						$items[] = esc_html( $value );
+					}
+					return implode( ' | ', $items );
+				}
 			}
 		}
 

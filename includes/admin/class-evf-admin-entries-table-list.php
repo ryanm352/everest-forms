@@ -206,12 +206,17 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 				$field_html  = array();
 				$field_value = maybe_unserialize( $value );
 
-				if ( ! empty( $field_value ) ) {
-					foreach ( $field_value as $field => $meta_val ) {
-						$field_html[] = $meta_val;
+				if ( ! empty( $field_value['label'] ) && is_array( $field_value['label'] ) ) {
+					foreach ( $field_value['label'] as $value) {
+						$field_html[] = esc_html( $value );
+					}
+				} else {
+					if ( ! empty( $field_value ) ) {
+						foreach ( $field_value as $field => $meta_val ) {
+							$field_html[] = $meta_val;
+						}
 					}
 				}
-
 				$value = implode( ' | ', $field_html );
 			}
 
